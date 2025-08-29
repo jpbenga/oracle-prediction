@@ -1,0 +1,52 @@
+// src/styles.scss
+
+// 1. Importer les fonctions en utilisant un chemin relatif robuste
+@use '../node_modules/@angular/material' as mat;
+
+// 2. Inclure les styles de base (obligatoire)
+@include mat.core();
+
+// 3. Définir votre palette de couleurs personnalisée
+$matrix-dark-primary-palette: (
+  50: #e2e2e2, 100: #b7b7b7, 200: #878787, 300: #575757, 400: #323232,
+  500: #1c1c1c, 600: #121212, 700: #0f0f0f, 800: #0a0a0a, 900: #050505,
+  contrast: (
+    50: #000, 100: #000, 200: #000, 300: #fff, 400: #fff, 500: #fff,
+    600: #fff, 700: #fff, 800: #fff, 900: #fff,
+  )
+);
+
+$matrix-green-accent-palette: (
+  50: #e6ffeb, 100: #c2ffcf, 200: #99ffb0, 300: #6fff91, 400: #4dff79,
+  500: #00FF41, 600: #29ff61, 700: #23ff58, 800: #1eff4f, 900: #14ff40,
+  contrast: (
+    50: #000, 100: #000, 200: #000, 300: #000, 400: #000, 500: #000,
+    600: #000, 700: #000, 800: #000, 900: #000,
+  )
+);
+
+// 4. Créer le thème à partir de vos palettes
+$matrix-primary: mat.define-palette($matrix-dark-primary-palette, 800);
+$matrix-accent: mat.define-palette($matrix-green-accent-palette, 500);
+
+$matrix-theme: mat.define-dark-theme((
+  color: (
+    primary: $matrix-primary,
+    accent: $matrix-accent,
+  )
+));
+
+// 5. Appliquer le thème à tous les composants Angular Material
+@include mat.all-component-themes($matrix-theme);
+
+// 6. Ajouter vos styles globaux restants
+html, body { 
+  height: 100%; 
+}
+
+body { 
+  margin: 0; 
+  font-family: Roboto, "Helvetica Neue", sans-serif; 
+  background-color: #0A0A0A;
+  color: #E0E0E0;
+}

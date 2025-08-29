@@ -1,0 +1,15 @@
+<mat-toolbar color="primary">
+  <span>Tickets du Jour</span>
+</mat-toolbar>
+
+<div class="p-6">
+  <app-tickets-list [tickets]="ticketsData"></app-tickets-list>
+
+  <div *ngIf="isLoading" class="flex justify-center mt-8">
+    <mat-progress-spinner mode="indeterminate"></mat-progress-spinner>
+  </div>
+
+  <div *ngIf="error" class="text-center text-red-500 mt-8">
+    {{ error }}
+  </div>
+</div>
