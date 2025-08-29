@@ -12,7 +12,7 @@
             "id": "Al-Qadisiyah FC vs Al Najma|match_under_3.5",
             "matchLabel": "Al-Qadisiyah FC vs Al Najma",
             "date": "30/08/2025",
-            "time": "18:00",
+            "time": "20:00",
             "scores": {
               "home_over_0.5": 48.931381663381224,
               "home_under_0.5": 51.068618336618776,
@@ -135,10 +135,12 @@
               "match_under_4.75": 1.24,
               "match_over_5.0": 4.33,
               "match_under_5.0": 1.14,
-              "match_over_5.25": 4.65,
-              "match_under_5.25": 1.12,
+              "match_over_5.25": 4.6,
+              "match_under_5.25": 1.13,
               "match_over_6.0": 7.9,
-              "match_under_6.0": 1.02
+              "match_under_6.0": 1.02,
+              "match_over_1.0": 1.01,
+              "match_under_1.0": 13
             },
             "isEarlySeason": true,
             "market": "match_under_3.5",
@@ -172,12 +174,7 @@
     "Equilibre": [],
     "Audacieux": []
   },
-  "30/09/2025": {
-    "Prudent": [],
-    "Equilibre": [],
-    "Audacieux": []
-  },
-  "11/10/2025": {
+  "01/10/2025": {
     "Prudent": [],
     "Equilibre": [],
     "Audacieux": []

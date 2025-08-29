@@ -1,15 +1,26 @@
-<mat-toolbar color="primary">
-  <span>Tickets du Jour</span>
-</mat-toolbar>
+<header class="p-4 border-b border-[#222] flex justify-between items-center">
+  <h1 class="text-2xl font-bold text-[#00FF41]">The Oracle</h1>
+  <button (click)="togglePremium()" 
+          [ngClass]="isPremium ? 'bg-[#333] text-[#E0E0E0]' : 'bg-[#00FF41] text-black'"
+          class="px-4 py-2 rounded">
+    {{ isPremium ? 'Switch to Free View' : 'Activate Premium' }}
+  </button>
+</header>
 
-<div class="p-6">
+<main class="container mx-auto p-4">
+  <app-day-selector 
+    [selectedDayOffset]="selectedDayOffset" 
+    [isPremium]="isPremium"
+    (selectDay)="handleDaySelect($event)">
+  </app-day-selector>
+
   <app-tickets-list [tickets]="ticketsData"></app-tickets-list>
 
   <div *ngIf="isLoading" class="flex justify-center mt-8">
-    <mat-progress-spinner mode="indeterminate"></mat-progress-spinner>
+    <div class="text-center">Loading...</div>
   </div>
 
   <div *ngIf="error" class="text-center text-red-500 mt-8">
     {{ error }}
   </div>
-</div>
+</main>

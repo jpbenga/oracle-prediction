@@ -1,19 +1,19 @@
-<mat-card class="h-full">
-  <mat-card-header class="justify-center">
-    <mat-card-title>
+<div class="h-full rounded-lg border border-[#222] bg-[#121212] overflow-hidden flex flex-col">
+  <div class="p-3 border-b border-[#222] bg-[#0F0F0F] text-center">
+    <h3 class="font-bold text-lg text-[#00FF41]">
       Cote Totale : {{ ticket.totalOdd.toFixed(2) }}
-    </mat-card-title>
-  </mat-card-header>
-  <mat-card-content>
+    </h3>
+  </div>
+  <div class="p-4 flex-grow">
     <div *ngFor="let bet of ticket.bets; let isLast = last">
       <div class="py-2">
         <p class="font-semibold">{{ bet.matchLabel }}</p>
-        <div class="flex justify-between items-center text-gray-500">
+        <div class="flex justify-between items-center text-gray-400">
           <span>{{ bet.market }}</span>
-          <span class="font-mono font-bold">@ {{ bet.odd.toFixed(2) }}</span>
+          <span class="font-mono font-bold text-white">@ {{ bet.odd.toFixed(2) }}</span>
         </div>
       </div>
-      <mat-divider *ngIf="!isLast"></mat-divider>
+      <hr *ngIf="!isLast" class="border-[#222]">
     </div>
-  </mat-card-content>
-</mat-card>
+  </div>
+</div>

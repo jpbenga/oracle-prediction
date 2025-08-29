@@ -1,1 +1,32 @@
-<p>day-selector works!</p>
+<div class="mb-8">
+  <div class="flex justify-between items-center mb-4">
+    <button (click)="prevDay()" [disabled]="selectedDayOffset <= -6" class="p-2 rounded-full hover:bg-[#222] transition-colors disabled:opacity-50">
+      &lt;
+    </button>
+    <h2 class="text-xl font-bold">
+      {{ formatDate(getDateForOffset(selectedDayOffset), selectedDayOffset) }}
+    </h2>
+    <button (click)="nextDay()" [disabled]="selectedDayOffset >= 6" class="p-2 rounded-full hover:bg-[#222] transition-colors disabled:opacity-50">
+      &gt;
+    </button>
+  </div>
+  <div class="flex overflow-x-auto pb-4 space-x-2 scrollbar-hide">
+    <button *ngFor="let offset of dayOffsets" (click)="onSelectDay(offset)"
+            [ngClass]="{
+              'bg-[#222] border border-[#00FF41]': offset === selectedDayOffset,
+              'bg-[#111] hover:bg-[#1A1A1A]': offset !== selectedDayOffset,
+              'opacity-60': !isPremium && offset > 0
+            }"
+            class="flex flex-col items-center justify-center min-w-[60px] h-16 rounded p-2 transition-all relative">
+      <span class="text-xs">
+        {{ offset === 0 ? 'Today' : offset > 0 ? 'D+'+offset : 'D'+offset }}
+      </span>
+      <span class="text-sm font-mono">
+        {{ getDateForOffset(offset).getDate() }}
+      </span>
+      <ng-container *ngIf="!isPremium && offset > 0">
+        <span class="absolute top-1 right-1 text-xs text-[#666]">🔒</span>
+      </ng-container>
+    </button>
+  </div>
+</div>
