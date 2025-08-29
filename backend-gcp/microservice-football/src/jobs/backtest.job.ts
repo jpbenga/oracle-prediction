@@ -67,11 +67,20 @@ function analyzeMatchMarkets(fixture: any, projectedHomeGoals: number, projected
     return results;
 }
 
+const initTrancheObject = () => ({
+    '0-59': { success: 0, total: 0, avgPredicted: 0 }, '60-69': { success: 0, total: 0, avgPredicted: 0 }, '70-79': { success: 0, total: 0, avgPredicted: 0 },
+    '80-89': { success: 0, total: 0, avgPredicted: 0 }, '90-100': { success: 0, total: 0, avgPredicted: 0 }
+});
+
 async function runBacktest() {
     console.log(chalk.blue.bold("--- Démarrage du Job de Backtesting (Version Complète) ---"));
     const season = new Date().getFullYear();
-    let detailedResults = [];
+    let detailedResults: any[] = [];
     let totalMatchesAnalyzed = 0;
+    let marketOccurrences: { [key: string]: number } = {};
+    let trancheAnalysis: { [key: string]: any } = {};
+    let earlySeasonTrancheSummary = initTrancheObject();
+    let calibrationReport: { [key: string]: any } = {};
 
     for (const league of LEAGUES_TO_ANALYZE) {
         console.log(chalk.cyan.bold(`\n[Analyse de la ligue] ${league.name}`));
@@ -146,23 +155,13 @@ async function runBacktest() {
                     away_st: (projectedAwayGoals * 0.55) * lambdaBoost
                 };
 
-                const predictionResult = analyseMatchService.predict(lambdas, homeStats, awayStats);
+                const predictionResult = analyseMatchService.predict(lambdas, homeStats, awayStats, projectedHomeGoals, projectedAwayGoals);
                 let confidenceScores = predictionResult.markets;
 
-                for (const market in confidenceScores) {
-                    if (['draw', 'favorite_win', 'outsider_win'].includes(market)) {
-                        confidenceScores[market] *= 1.2;
-                    }
-                }
-
-                // CORRECTION : On indique explicitement à TypeScript que les valeurs sont des nombres.
-                const maxConfidence = Math.max(...Object.values(confidenceScores) as number[]);
-                if (maxConfidence < 60) {
-                    console.log(chalk.yellow(`      -> Match exclu : aucune prédiction avec confiance ≥ 60%.`));
-                    continue;
-                }
-
                 const marketResults = analyzeMatchMarkets(match, projectedHomeGoals, projectedAwayGoals);
+                if (!marketResults) continue;
+
+                for (const market in marketResults) { if (marketResults[market] === true) { marketOccurrences[market] = (marketOccurrences[market] || 0) + 1; } }
 
                 detailedResults.push({
                     leagueName: league.name,
@@ -172,13 +171,70 @@ async function runBacktest() {
                     scores: confidenceScores
                 });
 
+                for (const market in confidenceScores) {
+                    if (!marketResults.hasOwnProperty(market)) continue;
+                    if (!trancheAnalysis[market]) trancheAnalysis[market] = initTrancheObject();
+                    const score = confidenceScores[market];
+                    const wasSuccess = marketResults[market];
+                    let trancheKey: '0-59' | '60-69' | '70-79' | '80-89' | '90-100';
+                    if (score < 60) trancheKey = '0-59';
+                    else if (score < 70) trancheKey = '60-69';
+                    else if (score < 80) trancheKey = '70-79';
+                    else if (score < 90) trancheKey = '80-89';
+                    else trancheKey = '90-100';
+                    trancheAnalysis[market][trancheKey].total++;
+                    trancheAnalysis[market][trancheKey].avgPredicted += score;
+                    if (wasSuccess) trancheAnalysis[market][trancheKey].success++;
+                    if (isEarlySeason) {
+                        earlySeasonTrancheSummary[trancheKey].total++;
+                        earlySeasonTrancheSummary[trancheKey].avgPredicted += score;
+                        if (wasSuccess) earlySeasonTrancheSummary[trancheKey].success++;
+                    }
+                }
+
                 await sleep(500);
             }
         }
     }
 
     try {
-        const finalReport = { totalMatchesAnalyzed, detailedResults };
+        for (const market in trancheAnalysis) {
+            if ((marketOccurrences[market] || 0) < 20) {
+                delete trancheAnalysis[market];
+            }
+        }
+
+        const globalTrancheSummary = initTrancheObject();
+        for (const market in trancheAnalysis) {
+            for (const key in trancheAnalysis[market]) {
+                globalTrancheSummary[key as keyof typeof globalTrancheSummary].success += trancheAnalysis[market][key].success;
+                globalTrancheSummary[key as keyof typeof globalTrancheSummary].total += trancheAnalysis[market][key].total;
+                globalTrancheSummary[key as keyof typeof globalTrancheSummary].avgPredicted += trancheAnalysis[market][key].avgPredicted;
+            }
+        }
+        calibrationReport = {};
+        for (const market in trancheAnalysis) {
+            calibrationReport[market] = {};
+            for (const key in trancheAnalysis[market]) {
+                const tranche = trancheAnalysis[market][key];
+                if (tranche.total > 0) {
+                    tranche.avgPredicted /= tranche.total;
+                    calibrationReport[market][key] = {
+                        predicted: tranche.avgPredicted.toFixed(2),
+                        actual: ((tranche.success / tranche.total) * 100).toFixed(2)
+                    };
+                }
+            }
+        }
+
+        for (const key in earlySeasonTrancheSummary) {
+            const tranche = earlySeasonTrancheSummary[key as keyof typeof earlySeasonTrancheSummary];
+            if (tranche.total > 0) {
+                tranche.avgPredicted /= tranche.total;
+            }
+        }
+
+        const finalReport = { totalMatchesAnalyzed, globalSummary: globalTrancheSummary, perMarketSummary: trancheAnalysis, marketOccurrences, calibration: calibrationReport, earlySeasonSummary: earlySeasonTrancheSummary, detailedResults };
         fs.writeFileSync('bilan_backtest.json', JSON.stringify(finalReport, null, 2));
         console.log(chalk.magenta.bold('\n-> Bilan du backtest sauvegardé dans le fichier bilan_backtest.json'));
     } catch (error) {

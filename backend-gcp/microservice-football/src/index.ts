@@ -12,9 +12,9 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 
 // --- CONFIGURATION CORS SPÉCIFIQUE ---
-// Remplacez l'URL ci-dessous par l'URL exacte de votre frontend (port 4200)
 const corsOptions = {
-    origin: 'https://4200-firebase-oracle-1756386464926.cluster-64pjnskmlbaxowh5lzq6i7v4ra.cloudworkstations.dev',
+    origin: 'http://localhost:4200', // Autoriser le frontend local
+    credentials: true, // Autoriser les cookies et les en-têtes d'authentification
     optionsSuccessStatus: 200
 };
 app.use(cors(corsOptions));

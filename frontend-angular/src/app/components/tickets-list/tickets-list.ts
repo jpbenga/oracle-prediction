@@ -11,5 +11,12 @@ import { TicketCard } from '../ticket-card/ticket-card';
 })
 export class TicketsList {
   @Input() tickets: any;
+  @Input() selectedDayOffset: number = 0;
   objectKeys = Object.keys;
+
+  getSelectedDayKey(): string {
+    const date = new Date();
+    date.setDate(date.getDate() + this.selectedDayOffset);
+    return date.toLocaleDateString('fr-FR');
+  }
 }

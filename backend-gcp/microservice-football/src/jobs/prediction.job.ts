@@ -1,6 +1,6 @@
 const chalk = require('chalk');
 const fs = require('fs');
-const { LEAGUES_TO_ANALYZE } = require('../config/football.config');
+const { LEAGUES_TO_ANALYZE, LOW_OCCURRENCE_MARKETS } = require('../config/football.config');
 const { apiFootballService } = require('../services/ApiFootball.service');
 const { gestionJourneeService } = require('../services/GestionJournee.service');
 const { analyseMatchService } = require('../services/AnalyseMatch.service');
@@ -28,10 +28,37 @@ function parseOdds(oddsData: any[]) {
     const parsed: { [key: string]: number } = {};
     const fixtureOdds = oddsData[0];
     for (const bookmaker of fixtureOdds.bookmakers) {
+        const matchWinnerBet = bookmaker.bets.find((b: any) => b.id === 1);
+        const doubleChanceBet = bookmaker.bets.find((b: any) => b.id === 12);
+        if (matchWinnerBet) {
+            const homeOdd = parseFloat(matchWinnerBet.values.find((v: any) => v.value === 'Home')?.odd);
+            const drawOdd = parseFloat(matchWinnerBet.values.find((v: any) => v.value === 'Draw')?.odd);
+            const awayOdd = parseFloat(matchWinnerBet.values.find((v: any) => v.value === 'Away')?.odd);
+            if (homeOdd && drawOdd && awayOdd) {
+                if (!parsed['draw']) parsed['draw'] = drawOdd;
+                const isHomeFavorite = homeOdd < awayOdd;
+                if (!parsed['favorite_win']) parsed['favorite_win'] = isHomeFavorite ? homeOdd : awayOdd;
+                if (!parsed['outsider_win']) parsed['outsider_win'] = isHomeFavorite ? awayOdd : homeOdd;
+                if (doubleChanceBet) {
+                    const homeDrawOdd = parseFloat(doubleChanceBet.values.find((v: any) => v.value === 'Home/Draw')?.odd);
+                    const awayDrawOdd = parseFloat(doubleChanceBet.values.find((v: any) => v.value === 'Draw/Away')?.odd);
+                    if (homeDrawOdd && awayDrawOdd) {
+                        if (!parsed['double_chance_favorite']) parsed['double_chance_favorite'] = isHomeFavorite ? homeDrawOdd : awayDrawOdd;
+                        if (!parsed['double_chance_outsider']) parsed['double_chance_outsider'] = isHomeFavorite ? awayDrawOdd : homeDrawOdd;
+                    }
+                }
+            }
+        }
         for (const bet of bookmaker.bets) {
             switch (bet.id) {
                 case 5: bet.values.forEach((v: any) => { const k = `match_${v.value.toLowerCase().replace(' ', '_')}`; if (!parsed[k]) parsed[k] = parseFloat(v.odd); }); break;
                 case 8: bet.values.forEach((v: any) => { const k = v.value === 'Yes' ? 'btts' : 'btts_no'; if (!parsed[k]) parsed[k] = parseFloat(v.odd); }); break;
+                case 16: bet.values.forEach((v: any) => { const k = `home_${v.value.toLowerCase().replace(' ', '_')}`; if (!parsed[k]) parsed[k] = parseFloat(v.odd); }); break;
+                case 17: bet.values.forEach((v: any) => { const k = `away_${v.value.toLowerCase().replace(' ', '_')}`; if (!parsed[k]) parsed[k] = parseFloat(v.odd); }); break;
+                case 6: bet.values.forEach((v: any) => { const k = `ht_${v.value.toLowerCase().replace(' ', '_')}`; if (!parsed[k]) parsed[k] = parseFloat(v.odd); }); break;
+                case 26: bet.values.forEach((v: any) => { const k = `st_${v.value.toLowerCase().replace(' ', '_')}`; if (!parsed[k]) parsed[k] = parseFloat(v.odd); }); break;
+                case 105: bet.values.forEach((v: any) => { const k = `home_ht_${v.value.toLowerCase().replace(' ', '_')}`; if (!parsed[k]) parsed[k] = parseFloat(v.odd); }); break;
+                case 106: bet.values.forEach((v: any) => { const k = `away_ht_${v.value.toLowerCase().replace(' ', '_')}`; if (!parsed[k]) parsed[k] = parseFloat(v.odd); }); break;
             }
         }
     }
@@ -116,31 +143,37 @@ async function runPrediction() {
                     away_st: (projectedAwayGoals * 0.55) * lambdaBoost
                 };
 
-                const predictionResult = analyseMatchService.predict(lambdas, homeStats, awayStats);
+                const predictionResult = analyseMatchService.predict(lambdas, homeStats, awayStats, projectedHomeGoals, projectedAwayGoals);
                 let confidenceScores = predictionResult.markets;
 
                 for (const market in confidenceScores) {
-                    if (['draw', 'favorite_win', 'outsider_win'].includes(market)) {
-                        confidenceScores[market] *= 1.2;
+                    if (LOW_OCCURRENCE_MARKETS.includes(market)) {
+                        delete confidenceScores[market];
                     }
                 }
 
                 const maxConfidence = Math.max(...Object.values(confidenceScores) as number[]);
                 if (maxConfidence < 60) {
-                    console.log(chalk.yellow(`      -> Match exclu : aucune prédiction avec confiance ≥ 60%.`));
+                    console.log(chalk.yellow(`      -> Match exclu : aucune prédiction avec confiance \u2265 60%.`));
                     continue;
                 }
                 
                 const parsedOdds = parseOdds(oddsData || []);
                 const fixtureDate = new Date(match.fixture.date);
+                const country = league.name.includes('(') ? league.name.match(/\(([^)]+)\)/)[1] : league.name;
 
-                // CORRECTION : On s'assure que le tableau existe avant d'y ajouter des éléments.
                 const leaguePredictions = predictions[league.name];
                 if (leaguePredictions) {
                     leaguePredictions.push({
                         matchLabel: `${match.teams.home.name} vs ${match.teams.away.name}`,
+                        homeTeam: match.teams.home.name,
+                        awayTeam: match.teams.away.name,
+                        homeLogo: match.teams.home.logo,
+                        awayLogo: match.teams.away.logo,
                         date: fixtureDate.toLocaleDateString('fr-FR'),
                         time: fixtureDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+                        league: league.name,
+                        country: country,
                         scores: confidenceScores,
                         odds: parsedOdds,
                         isEarlySeason

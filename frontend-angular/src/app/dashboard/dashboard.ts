@@ -27,7 +27,33 @@ export class Dashboard implements OnInit {
   ngOnInit(): void {
     this.ticketService.getTickets().subscribe({
       next: (data) => {
-        this.ticketsData = this.filterTicketsByDay(data, this.selectedDayOffset);
+        if (data && Object.keys(data).length > 0) {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const todayKey = today.toLocaleDateString('fr-FR');
+
+          const hasTicketsForToday = data[todayKey] && 
+            (data[todayKey].Prudent.length > 0 || 
+             data[todayKey].Equilibre.length > 0 || 
+             data[todayKey].Audacieux.length > 0);
+
+          if (!hasTicketsForToday) {
+            const firstDayWithTickets = Object.keys(data).find(day => 
+              data[day].Prudent.length > 0 || 
+              data[day].Equilibre.length > 0 || 
+              data[day].Audacieux.length > 0
+            );
+
+            if (firstDayWithTickets) {
+              const [day, month, year] = firstDayWithTickets.split('/');
+              const ticketDate = new Date(`${year}-${month}-${day}`);
+              ticketDate.setHours(0, 0, 0, 0);
+              const diffTime = ticketDate.getTime() - today.getTime();
+              this.selectedDayOffset = Math.round(diffTime / (1000 * 60 * 60 * 24));
+            }
+          }
+        }
+        this.ticketsData = data;
         this.isLoading = false;
       },
       error: (err) => {
@@ -39,31 +65,13 @@ export class Dashboard implements OnInit {
 
   handleDaySelect(offset: number): void {
     if (!this.isPremium && offset > 0) {
-      // In a real app, you would show a paywall.
-      // For now, we'll just log a message.
       console.log('Paywall should be shown for future dates.');
       return;
     }
     this.selectedDayOffset = offset;
-    // Here you would typically refetch the data for the selected day.
-    // For this example, we'll filter the existing data.
-    this.ticketService.getTickets().subscribe(data => {
-      this.ticketsData = this.filterTicketsByDay(data, this.selectedDayOffset);
-    });
   }
 
   togglePremium(): void {
     this.isPremium = !this.isPremium;
-  }
-
-  private filterTicketsByDay(data: any, offset: number): any {
-    const targetDate = new Date();
-    targetDate.setDate(targetDate.getDate() + offset);
-    const targetDateString = targetDate.toISOString().split('T')[0];
-
-    if (data && data[targetDateString]) {
-      return { [targetDateString]: data[targetDateString] };
-    }
-    return {};
   }
 }

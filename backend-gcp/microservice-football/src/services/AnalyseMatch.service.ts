@@ -56,7 +56,7 @@ class AnalyseMatchService {
         };
     }
 
-    public predict(lambdas: Lambdas, homeStats: TeamStats, awayStats: TeamStats) {
+    public predict(lambdas: Lambdas, homeStats: TeamStats, awayStats: TeamStats, projectedHomeGoals: number, projectedAwayGoals: number) {
         const { home, away, ht, st, home_ht, home_st, away_ht, away_st } = lambdas;
         const markets: { [key: string]: number } = {};
         
@@ -65,7 +65,6 @@ class AnalyseMatchService {
             const lambda = segments[prefix as keyof typeof segments];
             const segmentProbs = this.calculateOverUnderProbs(lambda);
             for (const key in segmentProbs) {
-                // CORRECTION FINALE : On vérifie que la valeur existe avant de l'assigner.
                 const value = segmentProbs[key];
                 if (value !== undefined) {
                     markets[`${prefix}_${key}`] = value;
@@ -74,28 +73,52 @@ class AnalyseMatchService {
         }
 
         const maxGoals = 8;
+        const scoreProbabilities: number[][] = Array(maxGoals + 1).fill(0).map(() => Array(maxGoals + 1).fill(0));
         let homeWinProb = 0, awayWinProb = 0, drawProb = 0;
-        let probBttsNo = 0;
 
         for (let i = 0; i <= maxGoals; i++) {
             for (let j = 0; j <= maxGoals; j++) {
                 const prob = this.poissonProbability(i, home) * this.poissonProbability(j, away);
+                const row = scoreProbabilities[i];
+                if (row) {
+                    row[j] = prob;
+                }
                 if (i > j) homeWinProb += prob;
                 else if (j > i) awayWinProb += prob;
                 else drawProb += prob;
-                
-                if (i === 0 || j === 0) {
-                    probBttsNo += prob;
-                }
             }
         }
-        probBttsNo -= this.poissonProbability(0, home) * this.poissonProbability(0, away);
 
+        const homeFormFactor = homeStats.form ? (parseFloat(homeStats.form) / 100) : 0.5;
+        const awayFormFactor = awayStats.form ? (parseFloat(awayStats.form) / 100) : 0.5;
+        const goalDisparity = Math.abs(projectedHomeGoals - projectedAwayGoals);
+        const disparityBoost = goalDisparity > 0.5 ? 1 + (goalDisparity - 0.5) * 0.2 : 1;
+        homeWinProb *= (1 + (homeFormFactor - awayFormFactor) * 0.3) * disparityBoost;
+        awayWinProb *= (1 + (awayFormFactor - homeFormFactor) * 0.3) * disparityBoost;
+        
         const totalProb = homeWinProb + awayWinProb + drawProb;
         if (totalProb > 0) {
             markets['home_win'] = (homeWinProb / totalProb) * 100;
             markets['away_win'] = (awayWinProb / totalProb) * 100;
             markets['draw'] = (drawProb / totalProb) * 100;
+        }
+
+        markets['favorite_win'] = Math.max(markets['home_win'] || 0, markets['away_win'] || 0);
+        markets['outsider_win'] = Math.min(markets['home_win'] || 0, markets['away_win'] || 0);
+        markets['double_chance_favorite'] = (markets['favorite_win'] || 0) + (markets['draw'] || 0);
+        markets['double_chance_outsider'] = (markets['outsider_win'] || 0) + (markets['draw'] || 0);
+
+        let probBttsNo = 0;
+        for (let i = 0; i <= maxGoals; i++) { 
+            const row = scoreProbabilities[i];
+            const firstRow = scoreProbabilities[0];
+            if(row && firstRow) {
+                probBttsNo += (row[0] || 0) + (firstRow[i] || 0); 
+            }
+        }
+        const cell = scoreProbabilities[0];
+        if(cell) {
+            probBttsNo -= (cell[0] || 0);
         }
 
         markets['btts'] = (1 - probBttsNo) * 100;

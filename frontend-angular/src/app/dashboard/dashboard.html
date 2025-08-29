@@ -14,7 +14,7 @@
     (selectDay)="handleDaySelect($event)">
   </app-day-selector>
 
-  <app-tickets-list [tickets]="ticketsData"></app-tickets-list>
+  <app-tickets-list [tickets]="ticketsData" [selectedDayOffset]="selectedDayOffset"></app-tickets-list>
 
   <div *ngIf="isLoading" class="flex justify-center mt-8">
     <div class="text-center">Loading...</div>

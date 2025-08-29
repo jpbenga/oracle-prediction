@@ -36,9 +36,12 @@ const LEAGUES_TO_ANALYZE = [
     { name: 'Premier League (Ukraine)', id: 235 }
 ];
 
+const LOW_OCCURRENCE_MARKETS = ['away_ht_over_3.5', 'home_ht_over_3.5', 'away_st_over_3.5', 'home_st_over_3.5'];
+
 module.exports = {
     API_KEY,
     API_HOST,
     MAX_API_ATTEMPTS,
     LEAGUES_TO_ANALYZE,
+    LOW_OCCURRENCE_MARKETS,
 };

@@ -10,6 +10,8 @@ const MAX_TICKETS_PER_PROFILE = 20;
 const MIN_ODD_PRUDENT = 1.5;
 const MAX_ODD_PRUDENT = 3;
 const TOLERANCE_ODD_PRUDENT = 0.1;
+const MIN_ODD_EQUILIBRE = 1.2;
+const MIN_ODD_AUDACIEUX = 1.35;
 const TARGET_ODD_EQUILIBRE_MIN = 5;
 const TARGET_ODD_EQUILIBRE_MAX = 12;
 const TARGET_ODD_AUDACIEUX_MIN = 30;
@@ -156,20 +158,9 @@ function runTicketGenerator() {
         return;
     }
 
-    if (bilanData.detailedResults) {
-        const marketOccurrences: { [key: string]: number } = {};
-        bilanData.detailedResults.forEach((match: any) => {
-            if (match.results) {
-                for (const market in match.results) {
-                    if (match.results[market] === true) {
-                        marketOccurrences[market] = (marketOccurrences[market] || 0) + 1;
-                    }
-                }
-            }
-        });
-
-        for (const market in marketOccurrences) {
-            const count = marketOccurrences[market];
+    if (bilanData.marketOccurrences) {
+        for (const market in bilanData.marketOccurrences) {
+            const count = bilanData.marketOccurrences[market];
             if(count) {
                 const rate = (count / totalBacktestMatches) * 100;
                 if (rate > MIN_OCCURRENCE_RATE) {
@@ -196,11 +187,12 @@ function runTicketGenerator() {
                 if (odd) {
                     const profiles: string[] = [];
                     if (score >= minScores.Prudent && odd >= MIN_ODD_PRUDENT) profiles.push('Prudent');
-                    if (score >= minScores.Equilibre) profiles.push('Equilibre');
-                    if (score >= minScores.Audacieux) profiles.push('Audacieux');
+                    if (score >= minScores.Equilibre && odd >= MIN_ODD_EQUILIBRE) profiles.push('Equilibre');
+                    if (score >= minScores.Audacieux && odd >= MIN_ODD_AUDACIEUX) profiles.push('Audacieux');
 
                     if (profiles.length > 0) {
-                        eligibleBets.push({ id: `${match.matchLabel}|${market}`, ...match, market, score, odd, profiles });
+                        const expectedValue = (score / 100) * odd;
+                        eligibleBets.push({ id: `${match.matchLabel}|${market}`, ...match, market, score, odd, profiles, expectedValue });
                     }
                 }
             }
