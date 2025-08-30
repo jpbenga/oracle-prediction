@@ -1,0 +1,54 @@
+<div>
+  <!-- 7-Day Rolling Success Rate Indicator -->
+  <div class="mb-6 p-4 bg-[#0A0A0A] border border-[#222] rounded-lg relative overflow-hidden">
+    <div class="absolute inset-0 pointer-events-none opacity-5">
+      <!-- Simplified background effect -->
+    </div>
+    <div class="relative z-10 flex items-center justify-between">
+      <div>
+        <div class="text-xs text-[#888] mb-1 font-mono">
+          FIABILITÉ DU SIGNAL (7J)
+        </div>
+        <div class="text-2xl font-bold font-mono text-[#00FF41]">
+          {{ sevenDayRate }}%
+        </div>
+      </div>
+      <button *ngIf="!isRawDataLocked" (click)="openRawData()" class="text-xs font-mono text-[#888] hover:text-[#00FF41] transition-colors border border-[#333] px-3 py-1 rounded flex items-center gap-1">
+        <span>&lt;&gt;</span>
+        <span>VOIR LE FLUX COMPLET</span>
+      </button>
+      <div *ngIf="isRawDataLocked" class="text-xs font-mono text-[#444] border border-[#333] px-3 py-1 rounded flex items-center gap-1 opacity-60">
+        <span>&lt;&gt;</span>
+        <span>FLUX VERROUILLÉ</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Daily Success Rate (for past days) -->
+  <div *ngIf="successRate !== null" class="mb-4 p-3 bg-[#111] rounded border border-[#333] text-center">
+      <span class="font-mono text-sm">Success Rate: </span>
+      <span class="font-mono font-bold text-[#00FF41]">
+        {{ successRate.toFixed(0) }}%
+      </span>
+  </div>
+
+  <!-- Prediction Cards -->
+  <div *ngIf="displayPredictions.length > 0; else noPredictions" class="space-y-4">
+    <app-prediction-card 
+      *ngFor="let p of displayPredictions"
+      [prediction]="p"
+      [isPast]="dayOffset < 0"
+      [isFuture]="dayOffset > 0"
+      [isPremium]="isPremium">
+    </app-prediction-card>
+  </div>
+
+  <ng-template #noPredictions>
+    <div class="text-center text-gray-500 py-8">
+      No predictions available for this day.
+    </div>
+  </ng-template>
+
+  <!-- Raw Data Flow Modal -->
+  <app-raw-data-flow *ngIf="showRawData" [predictions]="allRawPredictionsFlattened" (close)="closeRawData()" [dayOffset]="dayOffset"></app-raw-data-flow>
+</div>

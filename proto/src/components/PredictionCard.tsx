@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckIcon, XIcon, TrophyIcon } from 'lucide-react';
+import { CheckIcon, XIcon, TrophyIcon, ActivityIcon } from 'lucide-react';
 type Prediction = {
   id: string;
   sport: string;
@@ -24,13 +24,16 @@ export function PredictionCard({
 }) {
   // Determine if this prediction should be locked (future + non-premium)
   const isLocked = isFuture && !isPremium;
+  // Determine if prediction was incorrect
+  const isIncorrect = isPast && prediction.result === false;
   // Sport icon mapping
   const getSportIcon = (sport: string) => {
     switch (sport.toLowerCase()) {
       case 'football':
         return <div className="w-5 h-5" />;
       case 'basketball':
-        return <div className="w-5 h-5" />;
+        return <ActivityIcon className="w-5 h-5" />;
+      // Using Activity as basketball
       default:
         return <TrophyIcon className="w-5 h-5" />;
     }
@@ -54,14 +57,14 @@ export function PredictionCard({
         {/* Level 3: Prediction */}
         {!isLocked ? <div className="mb-3">
             <div className="text-center mb-2">
-              <span className="text-[#00FF41] font-mono font-bold">
+              <span className={`font-mono font-bold ${isIncorrect ? 'text-red-500' : 'text-[#00FF41]'}`}>
                 {prediction.prediction}
               </span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs">Confidence:</span>
               <div className="flex-1 bg-[#222] h-2 rounded-full overflow-hidden">
-                <div className="h-full bg-[#00FF41]" style={{
+                <div className={`h-full ${isIncorrect ? 'bg-red-500' : 'bg-[#00FF41]'}`} style={{
               width: `${prediction.confidence * 100}%`
             }}></div>
               </div>

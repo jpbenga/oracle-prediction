@@ -47,6 +47,17 @@ app.get('/api/tickets', (req: any, res: any) => {
     }
 });
 
+// --- NOUVELLE ROUTE API POUR LES PRÉDICTIONS BRUTES ---
+app.get('/api/predictions', (req: any, res: any) => {
+    try {
+        const filePath = path.join(__dirname, '..', 'predictions_du_jour.json');
+        const data = fs.readFileSync(filePath, 'utf8');
+        res.status(200).json(JSON.parse(data));
+    } catch (error) {
+        res.status(404).json({ message: "Le fichier de prédictions n'a pas encore été généré." });
+    }
+});
+
 
 app.listen(PORT, () => {
     console.log(chalk.inverse(`\n🏈 Microservice Football démarré sur le port ${PORT}`));

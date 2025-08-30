@@ -1,0 +1,81 @@
+<div class="fixed inset-0 bg-black bg-opacity-90 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div class="max-w-3xl w-full bg-[#080808] border border-[#222] rounded-lg overflow-hidden relative">
+      <!-- Matrix-inspired scanline effect -->
+      <div class="scanline-effect"></div>
+      
+      <!-- Header -->
+      <div class="flex items-center justify-between p-4 border-b border-[#222] bg-[#0A0A0A] relative z-10">
+        <div>
+          <h3 class="text-sm font-mono text-[#666]">
+            FLUX DE DONNÉES BRUT
+          </h3>
+          <div class="flex items-center gap-2">
+            <span class="text-[#00FF41] font-mono">
+              {{ dayOffset === 0 ? "AUJOURD'HUI" : dayOffset < 0 ? `J${dayOffset}` : `J+${dayOffset}` }}
+            </span>
+            <span *ngIf="calculateSuccessRate() !== null" class="text-xs font-mono bg-[#111] py-1 px-2 rounded">
+                TAUX DE RÉUSSITE:
+                <span class="text-[#00FF41]">{{ calculateSuccessRate()?.toFixed(0) }}%</span>
+            </span>
+          </div>
+        </div>
+        <button (click)="onClose()" class="p-2 hover:bg-[#111] rounded-full transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+
+      <!-- Raw Data Table -->
+      <div class="p-2 max-h-[70vh] overflow-y-auto relative z-10">
+        <table class="w-full border-collapse font-mono text-xs">
+          <thead class="text-[#666]">
+            <tr class="border-b border-[#222]">
+              <th class="p-2 text-left">SPORT</th>
+              <th class="p-2 text-left">HEURE</th>
+              <th class="p-2 text-left">COMPÉTITION</th>
+              <th class="p-2 text-left">MATCH</th>
+              <th class="p-2 text-left">PRÉDICTION</th>
+              <th class="p-2 text-left">CONF.</th>
+              <th *ngIf="isPast" class="p-2 text-center">RÉS.</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let prediction of predictions" class="border-b border-[#111] hover:bg-[#0A0A0A]">
+                <td class="p-2">
+                    <ng-container [ngSwitch]="prediction.league.toLowerCase()">
+                        <svg *ngSwitchCase="'football'" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+                        <svg *ngSwitchCase="'basketball'" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                        <svg *ngSwitchDefault xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+                    </ng-container>
+                </td>
+                <td class="p-2">{{ prediction.time }}</td>
+                <td class="p-2">{{ prediction.league }}</td>
+                <td class="p-2">
+                    {{ prediction.homeTeam }} vs {{ prediction.awayTeam }}
+                </td>
+                <td class="p-2 text-[#00FF41]">
+                    {{ getBestPredictionDetails(prediction).prediction }}
+                </td>
+                <td class="p-2">
+                    {{ (getBestPredictionDetails(prediction).confidence).toFixed(0) }}%
+                </td>
+                <td *ngIf="isPast && prediction.result !== undefined" class="p-2 text-center">
+                    <ng-container *ngIf="prediction.result; else incorrectResult">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-green-500 inline"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    </ng-container>
+                    <ng-template #incorrectResult>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-red-500 inline"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </ng-template>
+                </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Footer -->
+      <div class="p-3 border-t border-[#222] bg-[#0A0A0A] text-center relative z-10">
+        <span class="text-[#666] text-xs font-mono">
+          TOTAL: {{ predictions.length }} PRÉDICTIONS
+        </span>
+      </div>
+    </div>
+  </div>

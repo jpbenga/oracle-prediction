@@ -1,13 +1,9 @@
-<div *ngIf="tickets && tickets[getSelectedDayKey()]">
-  <div class="mb-12">
-    <h2 class="text-2xl font-semibold mb-6">🗓️ {{ getSelectedDayKey() }}</h2>
-
-    <div *ngFor="let profile of objectKeys(tickets[getSelectedDayKey()])">
-      <div *ngIf="tickets[getSelectedDayKey()][profile].length > 0" class="mb-8">
-        <h3 class="text-xl font-bold mb-4">{{ profile }}</h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <app-ticket-card *ngFor="let ticket of tickets[getSelectedDayKey()][profile]" [ticket]="ticket"></app-ticket-card>
-        </div>
+<div *ngIf="ticketsData && ticketsData[getSelectedDayKey()] as dayTickets">
+  <div *ngFor="let profile of objectKeys(dayTickets)">
+    <div *ngIf="dayTickets[profile].length > 0" class="mb-8">
+      <h3 class="text-xl font-bold mb-4">{{ profile }}</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <app-ticket-card *ngFor="let ticket of dayTickets[profile]" [ticket]="ticket"></app-ticket-card>
       </div>
     </div>
   </div>

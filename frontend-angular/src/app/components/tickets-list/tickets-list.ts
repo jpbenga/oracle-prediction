@@ -10,13 +10,18 @@ import { TicketCard } from '../ticket-card/ticket-card';
   styleUrls: ['./tickets-list.scss']
 })
 export class TicketsList {
-  @Input() tickets: any;
+  @Input() ticketsData: any;
   @Input() selectedDayOffset: number = 0;
+  
+  // Expose Object.keys to the template
   objectKeys = Object.keys;
 
   getSelectedDayKey(): string {
     const date = new Date();
     date.setDate(date.getDate() + this.selectedDayOffset);
-    return date.toLocaleDateString('fr-FR');
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
   }
 }

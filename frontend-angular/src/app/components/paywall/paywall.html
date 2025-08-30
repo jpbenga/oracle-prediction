@@ -1,0 +1,33 @@
+<div class="fixed inset-0 bg-black bg-opacity-80 backdrop-blur-sm flex items-center justify-center z-50 p-4" (click)="onClose()">
+    <div class="max-w-md w-full bg-[#0A0A0A] border border-[#00FF41] rounded-lg p-6 relative overflow-hidden" (click)="$event.stopPropagation()">
+      <!-- Matrix-inspired scanline effect -->
+      <div class="scanline-effect"></div>
+      <div class="relative z-10">
+        <h2 class="text-2xl font-bold text-[#00FF41] mb-4 text-center">
+          Le Voile
+        </h2>
+        <p class="mb-6 text-center">
+          Le Signal a été correct à
+          <span class="text-[#00FF41] font-mono font-bold">
+            82%
+          </span>
+          sur les 7 derniers jours.
+        </p>
+        <p class="mb-8 text-center">
+          Ne manquez pas les données de demain. Choisissez de savoir.
+        </p>
+        <div class="flex flex-col gap-3">
+          <button (click)="onActivate()" class="w-full py-3 bg-[#00FF41] text-black font-bold rounded hover:bg-opacity-90 transition-colors">
+            Accéder à la Réalité
+          </button>
+          <button (click)="onClose()" class="w-full py-3 bg-transparent border border-[#333] text-[#CCC] rounded hover:bg-[#111] transition-colors">
+            Retourner à la Simulation
+          </button>
+        </div>
+        <div class="mt-6 text-center text-xs text-[#666]">
+          <p>Accès premium: 9.99€/mois</p>
+          <p>Annulation à tout moment</p>
+        </div>
+      </div>
+    </div>
+</div>

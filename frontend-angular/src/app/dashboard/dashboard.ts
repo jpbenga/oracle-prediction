@@ -1,63 +1,50 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { TicketService } from '../services/ticket';
-import { TicketsList } from '../components/tickets-list/tickets-list';
+import { forkJoin } from 'rxjs';
+import { ApiService } from '../services/api.service';
 import { DaySelector } from '../components/day-selector/day-selector';
+import { Paywall } from '../components/paywall/paywall';
+import { PredictionsList } from '../components/predictions-list/predictions-list';
+import { TicketsList } from '../components/tickets-list/tickets-list';
+import { PredictionsApiResponse } from '../types/api-types';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
   imports: [
-    CommonModule, 
-    TicketsList,
-    DaySelector
+    CommonModule,
+    DaySelector,
+    Paywall,
+    PredictionsList,
+    TicketsList
   ],
   templateUrl: './dashboard.html',
   styleUrls: ['./dashboard.scss']
 })
 export class Dashboard implements OnInit {
+  predictionsData: PredictionsApiResponse | null = null;
   ticketsData: any = null;
   isLoading = true;
   error: string | null = null;
   selectedDayOffset = 0;
   isPremium = false;
+  showPaywall = false;
 
-  constructor(private ticketService: TicketService) {}
+  constructor(private apiService: ApiService) {}
 
   ngOnInit(): void {
-    this.ticketService.getTickets().subscribe({
+    this.isLoading = true;
+    forkJoin({
+      predictions: this.apiService.getPredictions(),
+      tickets: this.apiService.getTickets()
+    }).subscribe({
       next: (data) => {
-        if (data && Object.keys(data).length > 0) {
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          const todayKey = today.toLocaleDateString('fr-FR');
-
-          const hasTicketsForToday = data[todayKey] && 
-            (data[todayKey].Prudent.length > 0 || 
-             data[todayKey].Equilibre.length > 0 || 
-             data[todayKey].Audacieux.length > 0);
-
-          if (!hasTicketsForToday) {
-            const firstDayWithTickets = Object.keys(data).find(day => 
-              data[day].Prudent.length > 0 || 
-              data[day].Equilibre.length > 0 || 
-              data[day].Audacieux.length > 0
-            );
-
-            if (firstDayWithTickets) {
-              const [day, month, year] = firstDayWithTickets.split('/');
-              const ticketDate = new Date(`${year}-${month}-${day}`);
-              ticketDate.setHours(0, 0, 0, 0);
-              const diffTime = ticketDate.getTime() - today.getTime();
-              this.selectedDayOffset = Math.round(diffTime / (1000 * 60 * 60 * 24));
-            }
-          }
-        }
-        this.ticketsData = data;
+        this.predictionsData = data.predictions;
+        this.ticketsData = data.tickets;
         this.isLoading = false;
       },
       error: (err) => {
-        this.error = "Impossible de charger les tickets. Le backend est-il démarré et les jobs ont-ils été exécutés ?";
+        this.error = "Impossible de charger les données. Le backend est-il démarré et les fixtures JSON sont-elles présentes ?";
         this.isLoading = false;
       }
     });
@@ -65,10 +52,19 @@ export class Dashboard implements OnInit {
 
   handleDaySelect(offset: number): void {
     if (!this.isPremium && offset > 0) {
-      console.log('Paywall should be shown for future dates.');
+      this.showPaywall = true;
       return;
     }
     this.selectedDayOffset = offset;
+  }
+
+  closePaywall(): void {
+    this.showPaywall = false;
+  }
+
+  handleActivatePremium(): void {
+    this.isPremium = true;
+    this.showPaywall = false;
   }
 
   togglePremium(): void {

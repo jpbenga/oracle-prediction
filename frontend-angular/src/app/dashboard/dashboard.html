@@ -14,13 +14,36 @@
     (selectDay)="handleDaySelect($event)">
   </app-day-selector>
 
-  <app-tickets-list [tickets]="ticketsData" [selectedDayOffset]="selectedDayOffset"></app-tickets-list>
-
-  <div *ngIf="isLoading" class="flex justify-center mt-8">
-    <div class="text-center">Loading...</div>
+  <!-- Loading and Error States -->
+  <div *ngIf="isLoading" class="flex justify-center items-center h-64">
+    <div class="text-center text-lg">Loading data...</div>
   </div>
 
-  <div *ngIf="error" class="text-center text-red-500 mt-8">
-    {{ error }}
+  <div *ngIf="error" class="text-center text-red-500 my-8 p-4 border border-red-500 rounded-lg">
+    <p class="font-bold">Error loading data:</p>
+    <p>{{ error }}</p>
+  </div>
+
+  <!-- Data Display Container -->
+  <div *ngIf="!isLoading && !error">
+    <!-- Section for Prediction List (moved here) -->
+    <div class="mb-12">
+      <app-predictions-list 
+        [allPredictions]="predictionsData" 
+        [dayOffset]="selectedDayOffset"
+        [isPremium]="isPremium">
+      </app-predictions-list>
+    </div>
+
+    <!-- Section for Tickets -->
+    <div class="mb-12">
+      <h2 class="text-3xl font-bold mb-6 text-center">Tickets du Jour</h2>
+      <app-tickets-list 
+        [ticketsData]="ticketsData" 
+        [selectedDayOffset]="selectedDayOffset">
+      </app-tickets-list>
+    </div>
   </div>
 </main>
+
+<app-paywall *ngIf="showPaywall" (close)="closePaywall()" (activatePremium)="handleActivatePremium()"></app-paywall>
