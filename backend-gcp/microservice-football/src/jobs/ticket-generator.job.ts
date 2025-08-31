@@ -1,8 +1,10 @@
-process.env.FIRESTORE_EMULATOR_HOST = "localhost:8080";
+process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
+
 const chalk = require('chalk');
 const admin = require('firebase-admin');
 const { firestoreService } = require('../services/Firestore.service');
 
+// Le reste du fichier est inchangé
 if (admin.apps.length === 0) {
     admin.initializeApp();
 }
@@ -244,7 +246,7 @@ async function runTicketGenerator(options?: { date?: string }) {
                         for (const ticket of profileTickets) {
                             const ticketRef = db.collection('tickets').doc();
                             const betRefs = ticket.bets.map(bet => db.collection('predictions').doc(bet.id));
-        
+    
                             batch.set(ticketRef, {
                                 profile_key: profileKey,
                                 total_odd: ticket.totalOdd,
