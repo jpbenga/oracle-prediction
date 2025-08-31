@@ -23,8 +23,8 @@ export class RawDataFlow {
     return this.dayOffset < 0;
   }
 
-  getSportIcon(league: string): string {
-    switch (league.toLowerCase()) {
+  getSportIcon(leagueName: string): string {
+    switch (leagueName.toLowerCase()) {
       case 'football':
         return ''; // Placeholder for football icon
       case 'basketball':

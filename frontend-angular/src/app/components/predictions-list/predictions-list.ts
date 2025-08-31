@@ -101,7 +101,7 @@ export class PredictionsList implements OnChanges {
         awayTeam: match.awayTeam,
         homeLogo: match.homeLogo,
         awayLogo: match.awayLogo,
-        league: match.league,
+        league: match.leagueName,
         time: match.time,
         prediction: bestMarket,
         confidence: maxConfidence,

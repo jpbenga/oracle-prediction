@@ -226,6 +226,11 @@ async function runPrediction(options?: { leagueId?: string, matchdayNumber?: num
     }
     
     console.log(chalk.blue.bold("\n--- Job de Prédiction Terminé ---"));
+    
+    // Fermer la connexion Firestore pour permettre au script de se terminer
+    if (firestoreService && firestoreService.closeConnection) {
+        await firestoreService.closeConnection();
+    }
 }
 
 module.exports = { runPrediction };

@@ -1,4 +1,6 @@
-// Based on the structure from prediction.job.ts and the needs of the frontend.
+// Structures basées sur les données générées par les scripts Node.js
+
+// --- Prédictions (de predictions_du_jour.json) ---
 
 export interface Prediction {
   matchLabel: string;
@@ -6,22 +8,62 @@ export interface Prediction {
   awayTeam: string;
   homeLogo: string;
   awayLogo: string;
-  date: string; // "dd/MM/yyyy"
-  time: string;
-  league: string;
-  country: string;
+  date: string; // Format "dd/MM/yyyy"
+  time: string; // Format "HH:mm"
   scores: { [market: string]: number };
   odds: { [market: string]: number };
   isEarlySeason: boolean;
-  result?: boolean;
+  leagueName: string; // Ajout pour savoir à quelle ligue le match appartient
+  status?: 'PENDING' | 'ELIGIBLE' | 'INCOMPLETE' | 'COMPLETED'; // Statut de la prédiction
+  result?: any; // Peut contenir les scores finaux, etc.
 }
 
-// The API response for predictions is an object with league names as keys.
+// La réponse de l'API pour les prédictions est un objet avec les noms de ligue comme clés.
 export interface PredictionsApiResponse {
   [leagueName: string]: Prediction[];
 }
 
-// This is the simplified object we use for display in the prediction-card
+
+// --- Tickets (de tickets_du_jour.json) ---
+
+export interface Bet {
+  id: string;
+  league: string;
+  matchLabel: string;
+  homeTeam: string;
+  awayTeam: string;
+  homeLogo: string;
+  awayLogo: string;
+  date: string;
+  time: string;
+  market: string;
+  score: number;
+  odd: number;
+  isEarlySeason: boolean;
+  expectedValue: number;
+  profiles: ('Prudent' | 'Equilibre' | 'Audacieux')[];
+  result?: 'Win' | 'Loss' | 'Pending';
+}
+
+export interface Ticket {
+  bets: Bet[];
+  totalOdd: number;
+  profile: 'Prudent' | 'Equilibre' | 'Audacieux';
+  result?: 'Win' | 'Loss' | 'Pending';
+}
+
+// La réponse de l'API pour les tickets est un objet avec les dates comme clés,
+// puis les profils comme sous-clés.
+export interface TicketsApiResponse {
+  [date: string]: {
+    Prudent?: Ticket[];
+    Equilibre?: Ticket[];
+    Audacieux?: Ticket[];
+  };
+}
+
+// --- Objet simplifié pour l'affichage dans les composants ---
+
 export interface DisplayPrediction {
   homeTeam: string;
   awayTeam: string;
@@ -29,7 +71,9 @@ export interface DisplayPrediction {
   awayLogo: string;
   league: string;
   time: string;
-  prediction: string; // The best prediction market
+  predictionMarket: string; // Le marché de la meilleure prédiction
+  predictionValue?: 'Home' | 'Away' | 'Draw' | 'Yes' | 'No' | string; // e.g., Over 2.5, Yes (for BTTS)
   confidence: number;
-  result?: boolean;
+  odd?: number;
+  result?: 'Win' | 'Loss' | 'Pending';
 }

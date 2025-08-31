@@ -155,6 +155,16 @@ const firestoreService = {
     async updateTicket(ticketId: any, data: any) {
         const docRef = db.collection('tickets').doc(ticketId);
         await docRef.set(data, { merge: true });
+    },
+
+    async closeConnection() {
+        try {
+            console.log(chalk.yellow('      [Firestore] Fermeture de la connexion...'));
+            await admin.app().delete();
+            console.log(chalk.green('      [Firestore] Connexion fermée.'));
+        } catch (error) {
+            console.error(chalk.red('      [Firestore] Erreur lors de la fermeture de la connexion:'), error);
+        }
     }
 };
 

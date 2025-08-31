@@ -1,0 +1,23 @@
+{
+  "Ligue 1": [
+    {
+      "matchLabel": "PSG vs Lyon",
+      "homeTeam": "Paris Saint-Germain",
+      "awayTeam": "Olympique Lyonnais",
+      "homeLogo": "https://media.api-sports.io/football/teams/85.png",
+      "awayLogo": "https://media.api-sports.io/football/teams/80.png",
+      "date": "01/09/2025",
+      "time": "21:00",
+      "scores": {
+        "favorite_win": 85.5,
+        "match_over_2.5": 75.2
+      },
+      "odds": {
+        "favorite_win": 1.50,
+        "match_over_2.5": 1.80
+      },
+      "isEarlySeason": false,
+      "leagueName": "Ligue 1"
+    }
+  ]
+}

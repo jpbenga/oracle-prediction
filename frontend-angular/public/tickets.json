@@ -1,0 +1,29 @@
+{
+  "01/09/2025": {
+    "Prudent": [
+      {
+        "bets": [
+          {
+            "id": "PSG vs Lyon|favorite_win",
+            "league": "Ligue 1",
+            "matchLabel": "PSG vs Lyon",
+            "homeTeam": "Paris Saint-Germain",
+            "awayTeam": "Olympique Lyonnais",
+            "homeLogo": "https://media.api-sports.io/football/teams/85.png",
+            "awayLogo": "https://media.api-sports.io/football/teams/80.png",
+            "date": "01/09/2025",
+            "time": "21:00",
+            "market": "favorite_win",
+            "score": 85.5,
+            "odd": 1.50,
+            "isEarlySeason": false,
+            "expectedValue": 1.28,
+            "profiles": ["Prudent", "Equilibre"]
+          }
+        ],
+        "totalOdd": 1.50,
+        "profile": "Prudent"
+      }
+    ]
+  }
+}

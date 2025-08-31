@@ -6,7 +6,7 @@ import { DaySelector } from '../components/day-selector/day-selector';
 import { Paywall } from '../components/paywall/paywall';
 import { PredictionsList } from '../components/predictions-list/predictions-list';
 import { TicketsList } from '../components/tickets-list/tickets-list';
-import { PredictionsApiResponse } from '../types/api-types';
+import { PredictionsApiResponse, TicketsApiResponse } from '../types/api-types';
 
 @Component({
   selector: 'app-dashboard',
@@ -23,7 +23,7 @@ import { PredictionsApiResponse } from '../types/api-types';
 })
 export class Dashboard implements OnInit {
   predictionsData: PredictionsApiResponse | null = null;
-  ticketsData: any = null;
+  ticketsData: TicketsApiResponse | null = null;
   isLoading = true;
   error: string | null = null;
   selectedDayOffset = 0;
@@ -44,7 +44,7 @@ export class Dashboard implements OnInit {
         this.isLoading = false;
       },
       error: (err) => {
-        this.error = "Impossible de charger les données. Le backend est-il démarré et les fixtures JSON sont-elles présentes ?";
+        this.error = "Impossible de charger les données depuis Firestore. L'émulateur est-il bien démarré sur localhost:8080 ?";
         this.isLoading = false;
       }
     });
