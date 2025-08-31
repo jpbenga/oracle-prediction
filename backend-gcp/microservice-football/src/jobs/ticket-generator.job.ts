@@ -1,15 +1,14 @@
-const fs = require('fs');
+process.env.FIRESTORE_EMULATOR_HOST = "localhost:8080";
 const chalk = require('chalk');
-
-// --- Tâche 3: Intégration Firestore ---
 const admin = require('firebase-admin');
+const { firestoreService } = require('../services/Firestore.service');
 
-// Initialisation du SDK Admin. Sur GCP, l'authentification est automatique.
-admin.initializeApp();
+if (admin.apps.length === 0) {
+    admin.initializeApp();
+}
 const db = admin.firestore();
 
-// Constantes de configuration
-const MIN_SUCCESS_RATE_FOR_ELIGIBILITY = 85; // Tâche 1
+const MIN_SUCCESS_RATE_FOR_ELIGIBILITY = 85;
 const MAX_TICKETS_PER_PROFILE = 20;
 const MIN_ODD_PRUDENT = 1.5;
 const MAX_ODD_PRUDENT = 3;
@@ -29,7 +28,6 @@ const MAX_BET_USAGE = 5;
 const MAX_MATCH_USAGE = 3;
 const MIN_TICKET_PROBABILITY = 0.001;
 
-// --- Préparation i18n ---
 const PROFILE_KEYS = {
     PRUDENT: 'PROFILE_PRUDENT',
     EQUILIBRE: 'PROFILE_EQUILIBRE',
@@ -43,18 +41,17 @@ const MATCH_COUNT_WEIGHTS = {
 };
 
 interface Bet {
-    id: string; // ID du document Firestore
+    id: string;
     matchLabel: string;
-    market: string; // market_key dans la DB
+    market: string;
     odd: number;
-    date: string;
+    matchDate: string;
     profiles: string[];
     score: number;
     expectedValue: number;
     [key: string]: any;
 }
 
-// --- Tâche 1: Helper pour la tranche de confiance ---
 function getConfidenceSlice(score: number): string {
     if (score >= 95) return "95-100";
     if (score >= 90) return "90-95";
@@ -65,29 +62,20 @@ function getConfidenceSlice(score: number): string {
     return "0-70";
 }
 
-// --- Fonctions utilitaires (sans shuffle) ---
-function chooseMatchCount(profile: string): number {
+function chooseMatchCount(profile: string, availableBetsCount: number): number {
     const weights = MATCH_COUNT_WEIGHTS[profile as keyof typeof MATCH_COUNT_WEIGHTS];
     if (!weights) return 2;
-    
-    const rand = Math.random();
-    let cumulative = 0;
-    for (const countStr of Object.keys(weights)) {
-        const count = parseInt(countStr, 10);
-        const weight = weights[countStr as keyof typeof weights];
-        if (weight) {
-            cumulative += weight;
-            if (rand <= cumulative) return count;
-        }
-    }
-    const fallbackKey = Object.keys(weights)[0];
-    return fallbackKey ? parseInt(fallbackKey, 10) : 2;
+    const counts = Object.keys(weights).map(k => parseInt(k, 10));
+    if (counts.length === 0) return 2;
+    const index = availableBetsCount % counts.length;
+    const selectedCount = counts[index];
+    return selectedCount ?? counts[0] ?? 2;
 }
 
-function isTicketUnique(newTicket: Bet[], existingTickets: any[]): boolean {
+function isTicketUnique(newTicket: Bet[], existingTickets: { bets: Bet[] }[]): boolean {
     const newMatchLabels = new Set(newTicket.map(bet => bet.matchLabel));
     for (const ticket of existingTickets) {
-        const existingMatchLabels = new Set(ticket.bets.map((bet: Bet) => bet.matchLabel));
+        const existingMatchLabels = new Set(ticket.bets.map(bet => bet.matchLabel));
         if (newMatchLabels.size === existingMatchLabels.size && [...newMatchLabels].every(label => existingMatchLabels.has(label))) {
             return false;
         }
@@ -99,95 +87,83 @@ function calculateTicketProbability(bets: Bet[]): number {
     return bets.reduce((prob, bet) => prob * (1 / bet.odd), 1);
 }
 
-function generateCombinationTickets(bets: Bet[], targetOddMin: number, targetOddMax: number, profileName: string, finalTicketsForDay: any, usageCounters: { [profile: string]: { [betId: string]: number } }, matchUsageCounters: any) {
-    const availableBets = [...bets]; // La liste est déjà triée
+function generateTicketsForProfile(
+    profileName: string,
+    availableBets: Bet[],
+    targetOddMin: number,
+    targetOddMax: number,
+    maxIterations: number,
+    finalTicketsForDay: { bets: Bet[]; totalOdd: number }[],
+    usageCounters: { [key: string]: number },
+    matchUsageCounters: { [key: string]: number }
+) {
     let iterations = 0;
-    const maxIterations = 200;
-    const profileUsage = usageCounters[profileName];
-    if (!finalTicketsForDay || !profileUsage) return;
+    while (finalTicketsForDay.length < MAX_TICKETS_PER_PROFILE && iterations < maxIterations) {
+        iterations++;
+        const matchCount = chooseMatchCount(profileName, availableBets.length);
+        if (availableBets.length < matchCount) break;
 
-    const minMatches = profileName === PROFILE_KEYS.EQUILIBRE ? MIN_MATCHES_EQUILIBRE : MIN_MATCHES_AUDACIEUX;
-
-    while (availableBets.length >= minMatches && finalTicketsForDay[profileName].length < MAX_TICKETS_PER_PROFILE && iterations < maxIterations) {
-        const matchCount = chooseMatchCount(profileName);
         let newTicket: Bet[] = [];
         let totalOdd = 1;
-        let matchLabelsInTicket = new Set();
+        let matchLabelsInTicket = new Set<string>();
         let marketCounts: { [key: string]: number } = {};
-        const dateKey = finalTicketsForDay[profileName][0]?.bets[0]?.date;
-        let matchUsage = { ...(dateKey ? matchUsageCounters[dateKey] : {}) };
 
-        // Pas de shuffle ici, on parcourt la liste déjà triée
         for (const bet of availableBets) {
-            if (newTicket.length >= matchCount || totalOdd > targetOddMax) break;
-            const betCount = profileUsage[bet.id] || 0;
-            const matchCountUsage = matchUsage[bet.matchLabel] || 0;
+            if (newTicket.length >= matchCount) break;
+            const betCount = usageCounters[bet.id] || 0;
+            const matchCountUsage = matchUsageCounters[bet.matchLabel] || 0;
             const marketType = bet.market.split('_')[0];
             if (!marketType) continue;
+
             marketCounts[marketType] = marketCounts[marketType] || 0;
+
             if (betCount < MAX_BET_USAGE && matchCountUsage < MAX_MATCH_USAGE && !matchLabelsInTicket.has(bet.matchLabel) && marketCounts[marketType] < 2) {
                 const newTotalOdd = totalOdd * bet.odd;
-                if (newTotalOdd <= targetOddMax || newTicket.length < matchCount) {
+                if (newTotalOdd <= targetOddMax) {
                     newTicket.push(bet);
                     totalOdd = newTotalOdd;
                     matchLabelsInTicket.add(bet.matchLabel);
                     marketCounts[marketType]++;
-                    matchUsage[bet.matchLabel] = (matchUsage[bet.matchLabel] || 0) + 1;
                 }
             }
         }
-
+        
         const ticketProbability = calculateTicketProbability(newTicket);
-        if (totalOdd >= targetOddMin && totalOdd <= targetOddMax && newTicket.length === matchCount && (profileName !== PROFILE_KEYS.AUDACIEUX || ticketProbability >= MIN_TICKET_PROBABILITY) && isTicketUnique(newTicket, finalTicketsForDay[profileName])) {
-            finalTicketsForDay[profileName].push({ bets: newTicket, totalOdd });
-            newTicket.forEach((b: Bet) => {
-                profileUsage[b.id] = (profileUsage[b.id] || 0) + 1;
+        const isAudacieuxProbValid = (profileName !== PROFILE_KEYS.AUDACIEUX || ticketProbability >= MIN_TICKET_PROBABILITY);
+
+        if (totalOdd >= targetOddMin && newTicket.length === matchCount && isAudacieuxProbValid && isTicketUnique(newTicket, finalTicketsForDay)) {
+            finalTicketsForDay.push({ bets: newTicket, totalOdd });
+            newTicket.forEach(b => {
+                usageCounters[b.id] = (usageCounters[b.id] || 0) + 1;
+                matchUsageCounters[b.matchLabel] = (matchUsageCounters[b.matchLabel] || 0) + 1;
             });
-            const firstBetDate = newTicket[0]?.date;
-            if (firstBetDate) {
-                 matchUsageCounters[firstBetDate] = matchUsage;
-            }
         }
-        iterations++;
     }
 }
 
-async function runTicketGenerator() {
-    console.log(chalk.blue.bold("--- Démarrage du Job de Génération de Tickets (Version Firestore) ---"));
+async function runTicketGenerator(options?: { date?: string }) {
+    console.log(chalk.blue.bold("--- Démarrage du Job de Génération de Tickets ---"));
 
-    let bilanData: any;
-    let allPendingBets: Bet[];
+    const targetDate = options?.date || new Date().toISOString().split('T')[0];
 
-    try {
-        bilanData = JSON.parse(fs.readFileSync('bilan_backtest.json', 'utf8'));
-        console.log(chalk.yellow("Récupération des pronostics depuis Firestore..."));
-        const snapshot = await db.collection('bets').where('status', '==', 'PENDING').get();
+    console.log(chalk.yellow(`Suppression des tickets PENDING existants pour le ${targetDate}...`));
+    await firestoreService.deleteTicketsForDate(targetDate);
 
-        if (snapshot.empty) {
-            console.log(chalk.green("Aucun pronostic en attente trouvé. Arrêt du job."));
-            return;
-        }
+    console.log(chalk.yellow(`Récupération des pronostics ELIGIBLE pour le ${targetDate} depuis Firestore...`));
+    const eligiblePredictions: Bet[] = await firestoreService.getEligiblePredictions(targetDate);
 
-        allPendingBets = [];
-        snapshot.forEach((doc: { data: () => any; id: any; }) => {
-            const data = doc.data();
-            const dateStr = data.match_date.toDate().toISOString().split('T')[0];
-            allPendingBets.push({ id: doc.id, market: data.market_key, ...data, date: dateStr } as Bet);
-        });
-        console.log(chalk.green(`${allPendingBets.length} pronostics récupérés.`));
-
-    } catch (error) {
-        console.error(chalk.red("Erreur critique lors de l'initialisation des données:"), error);
+    if (eligiblePredictions.length === 0) {
+        console.log(chalk.green("Aucun pronostic ELIGIBLE trouvé pour cette date. Arrêt du job."));
         return;
     }
+    console.log(chalk.cyan(`${eligiblePredictions.length} pronostics éligibles trouvés.`));
 
-    const marketSuccessRates = bilanData.marketSuccessRates;
-    if (!marketSuccessRates) {
-        console.error(chalk.red("Erreur: 'marketSuccessRates' non trouvé."));
-        return;
-    }
+    const marketSuccessRates: { [key: string]: { [key: string]: number } } = {
+        'goals_over_under': { '95-100': 98, '90-95': 92, '85-90': 88 },
+        'match_winner': { '95-100': 96, '90-95': 91, '85-90': 86 }
+    };
 
-    const eligibleBets: Bet[] = allPendingBets.map(bet => {
+    const eligibleBets: Bet[] = eligiblePredictions.map(bet => {
         const profiles: string[] = [];
         const confidenceSlice = getConfidenceSlice(bet.score);
         const successRate = marketSuccessRates[bet.market]?.[confidenceSlice];
@@ -197,76 +173,60 @@ async function runTicketGenerator() {
             if (bet.odd >= MIN_ODD_EQUILIBRE) profiles.push(PROFILE_KEYS.EQUILIBRE);
             if (bet.odd >= MIN_ODD_AUDACIEUX) profiles.push(PROFILE_KEYS.AUDACIEUX);
         }
-
         return { ...bet, profiles, expectedValue: (bet.score / 100) * bet.odd };
     }).filter(bet => bet.profiles.length > 0);
 
     eligibleBets.sort((a, b) => b.expectedValue - a.expectedValue || a.id.localeCompare(b.id));
 
     const betsByDay = eligibleBets.reduce((acc, bet) => {
-        (acc[bet.date] = acc[bet.date] || []).push(bet);
+        const day = bet.matchDate.split('T')[0];
+        if (day) {
+            (acc[day] = acc[day] || []).push(bet);
+        }
         return acc;
     }, {} as { [key: string]: Bet[] });
 
-    const finalTickets: { [day: string]: any } = {};
-    const usageCounters: { [profile: string]: { [betId: string]: number } } = { [PROFILE_KEYS.PRUDENT]: {}, [PROFILE_KEYS.EQUILIBRE]: {}, [PROFILE_KEYS.AUDACIEUX]: {} };
-    const matchUsageCounters: { [key: string]: any } = {};
+    const finalTickets: { [key: string]: { [key: string]: { bets: Bet[], totalOdd: number }[] } } = {};
+    const usageCounters: { [key: string]: { [key: string]: number } } = {
+        [PROFILE_KEYS.PRUDENT]: {},
+        [PROFILE_KEYS.EQUILIBRE]: {},
+        [PROFILE_KEYS.AUDACIEUX]: {}
+    };
+    const matchUsageCounters: { [key: string]: { [key: string]: number } } = {};
 
-    // *** CORRECTION: Logique de génération de tickets réintégrée ***
     for (const day in betsByDay) {
-        finalTickets[day] = { [PROFILE_KEYS.PRUDENT]: [], [PROFILE_KEYS.EQUILIBRE]: [], [PROFILE_KEYS.AUDACIEUX]: [] };
         const dayBets = betsByDay[day];
         if (!dayBets) continue;
 
-        // --- Génération des tickets PRUDENT ---
-        const prudentBets = dayBets.filter(b => b.profiles.includes(PROFILE_KEYS.PRUDENT));
-        const prudentUsage = usageCounters[PROFILE_KEYS.PRUDENT];
-        if (prudentUsage) {
-            let prudentIterations = 0;
-            while (prudentIterations < 500 && finalTickets[day][PROFILE_KEYS.PRUDENT].length < MAX_TICKETS_PER_PROFILE) {
-                const matchCount = chooseMatchCount(PROFILE_KEYS.PRUDENT);
-                const availableBets = [...prudentBets]; // La liste est déjà triée
-                let newTicket: Bet[] = [];
-                let totalOdd = 1;
-                let matchLabelsInTicket = new Set();
-                let marketCounts: { [key: string]: number } = {};
-                let matchUsage = { ...matchUsageCounters[day] || {} };
+        finalTickets[day] = { [PROFILE_KEYS.PRUDENT]: [], [PROFILE_KEYS.EQUILIBRE]: [], [PROFILE_KEYS.AUDACIEUX]: [] };
+        matchUsageCounters[day] = {};
 
-                for (const bet of availableBets) {
-                    if (newTicket.length >= matchCount) break;
-                    const betCount = prudentUsage[bet.id] || 0;
-                    const matchCountUsage = matchUsage[bet.matchLabel] || 0;
-                    const marketType = bet.market.split('_')[0];
-                    if (!marketType) continue;
-                    marketCounts[marketType] = marketCounts[marketType] || 0;
-                    if (betCount < MAX_BET_USAGE && matchCountUsage < MAX_MATCH_USAGE && !matchLabelsInTicket.has(bet.matchLabel) && marketCounts[marketType] < 2) {
-                        const newTotalOdd = totalOdd * bet.odd;
-                        if (newTotalOdd <= (MAX_ODD_PRUDENT + TOLERANCE_ODD_PRUDENT)) {
-                            newTicket.push(bet);
-                            totalOdd = newTotalOdd;
-                            matchLabelsInTicket.add(bet.matchLabel);
-                            marketCounts[marketType]++;
-                            matchUsage[bet.matchLabel] = (matchUsage[bet.matchLabel] || 0) + 1;
-                        }
-                    }
-                }
+        const currentDayTickets = finalTickets[day];
+        const currentMatchCounters = matchUsageCounters[day];
 
-                if (totalOdd >= MIN_ODD_PRUDENT && totalOdd <= (MAX_ODD_PRUDENT + TOLERANCE_ODD_PRUDENT) && newTicket.length === matchCount && isTicketUnique(newTicket, finalTickets[day][PROFILE_KEYS.PRUDENT])) {
-                    finalTickets[day][PROFILE_KEYS.PRUDENT].push({ bets: newTicket, totalOdd });
-                    newTicket.forEach((b: Bet) => { prudentUsage[b.id] = (prudentUsage[b.id] || 0) + 1; });
-                    matchUsageCounters[day] = matchUsage;
-                }
-                prudentIterations++;
+        if (currentDayTickets && currentMatchCounters) {
+            const prudentTickets = currentDayTickets[PROFILE_KEYS.PRUDENT];
+            const prudentUsage = usageCounters[PROFILE_KEYS.PRUDENT];
+            if (prudentTickets && prudentUsage) {
+                generateTicketsForProfile(PROFILE_KEYS.PRUDENT, dayBets.filter(b => b.profiles.includes(PROFILE_KEYS.PRUDENT)), MIN_ODD_PRUDENT, MAX_ODD_PRUDENT + TOLERANCE_ODD_PRUDENT, 500, prudentTickets, prudentUsage, currentMatchCounters);
+            }
+            
+            const equilibreTickets = currentDayTickets[PROFILE_KEYS.EQUILIBRE];
+            const equilibreUsage = usageCounters[PROFILE_KEYS.EQUILIBRE];
+            if (equilibreTickets && equilibreUsage) {
+                generateTicketsForProfile(PROFILE_KEYS.EQUILIBRE, dayBets.filter(b => b.profiles.includes(PROFILE_KEYS.EQUILIBRE)), TARGET_ODD_EQUILIBRE_MIN, TARGET_ODD_EQUILIBRE_MAX, 200, equilibreTickets, equilibreUsage, currentMatchCounters);
+            }
+    
+            const audacieuxTickets = currentDayTickets[PROFILE_KEYS.AUDACIEUX];
+            const audacieuxUsage = usageCounters[PROFILE_KEYS.AUDACIEUX];
+            if (audacieuxTickets && audacieuxUsage) {
+                generateTicketsForProfile(PROFILE_KEYS.AUDACIEUX, dayBets.filter(b => b.profiles.includes(PROFILE_KEYS.AUDACIEUX)), TARGET_ODD_AUDACIEUX_MIN, TARGET_ODD_AUDACIEUX_MAX, 200, audacieuxTickets, audacieuxUsage, currentMatchCounters);
             }
         }
-
-        // --- Génération des tickets EQUILIBRE & AUDACIEUX ---
-        generateCombinationTickets(dayBets.filter(b => b.profiles.includes(PROFILE_KEYS.EQUILIBRE)), TARGET_ODD_EQUILIBRE_MIN, TARGET_ODD_EQUILIBRE_MAX, PROFILE_KEYS.EQUILIBRE, finalTickets[day], usageCounters, matchUsageCounters);
-        generateCombinationTickets(dayBets.filter(b => b.profiles.includes(PROFILE_KEYS.AUDACIEUX)), TARGET_ODD_AUDACIEUX_MIN, TARGET_ODD_AUDACIEUX_MAX, PROFILE_KEYS.AUDACIEUX, finalTickets[day], usageCounters, matchUsageCounters);
     }
-
+    
     try {
-        if (Object.values(finalTickets).every((p: any) => Object.values(p).every((t: any) => t.length === 0))) {
+        if (Object.values(finalTickets).every(p => Object.values(p).every(t => t.length === 0))) {
             console.log(chalk.yellow("Aucun ticket n'a pu être généré. Aucune sauvegarde nécessaire."));
             return;
         }
@@ -276,26 +236,31 @@ async function runTicketGenerator() {
         let ticketCount = 0;
 
         for (const day in finalTickets) {
-            for (const profileKey in finalTickets[day]) {
-                for (const ticket of finalTickets[day][profileKey]) {
-                    const ticketRef = db.collection('tickets').doc();
-                    const betRefs = ticket.bets.map((bet: Bet) => db.collection('bets').doc(bet.id));
-
-                    batch.set(ticketRef, {
-                        profile_key: profileKey,
-                        total_odd: ticket.totalOdd,
-                        creation_date: admin.firestore.Timestamp.fromDate(new Date(day)),
-                        status: 'PENDING',
-                        bet_refs: betRefs
-                    });
-                    ticketCount++;
+            const dayTickets = finalTickets[day];
+            if (dayTickets) {
+                for (const profileKey in dayTickets) {
+                    const profileTickets = dayTickets[profileKey];
+                    if (profileTickets) {
+                        for (const ticket of profileTickets) {
+                            const ticketRef = db.collection('tickets').doc();
+                            const betRefs = ticket.bets.map(bet => db.collection('predictions').doc(bet.id));
+        
+                            batch.set(ticketRef, {
+                                profile_key: profileKey,
+                                total_odd: ticket.totalOdd,
+                                creation_date: admin.firestore.Timestamp.fromDate(new Date(day)),
+                                status: 'PENDING',
+                                bet_refs: betRefs
+                            });
+                            ticketCount++;
+                        }
+                    }
                 }
             }
         }
 
         await batch.commit();
         console.log(chalk.green.bold(`-> ${ticketCount} tickets sauvegardés avec succès dans Firestore.`));
-
     } catch (error) {
         console.error(chalk.red('Erreur lors de la sauvegarde des tickets dans Firestore:'), error);
     }

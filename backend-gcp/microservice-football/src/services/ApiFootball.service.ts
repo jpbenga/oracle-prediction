@@ -26,16 +26,31 @@ class ApiFootballService {
         while (attempts < MAX_API_ATTEMPTS) {
             attempts++;
             try {
+                console.log(chalk.gray(`      -> Appel API (tentative ${attempts}): ${callName}`));
                 const response = await apiCall();
-                if (response.data && response.data.response) {
+
+                // Cas 1: Réponse valide avec des données
+                if (response.data && response.data.response && response.data.response.length > 0) {
+                    console.log(chalk.green(`      -> Succès API pour ${callName}`));
                     return response.data.response as T;
                 }
-            } catch (error) {
-                console.log(chalk.yellow(`      -> Tentative ${attempts}/${MAX_API_ATTEMPTS} (${callName}) échouée`));
+
+                // Cas 2: Réponse valide mais vide (ex: pas de stats pour une saison)
+                if (response.data && response.data.response && response.data.response.length === 0) {
+                    console.log(chalk.cyan(`      -> Réponse API vide pour ${callName}, considéré comme un succès (pas de données).`));
+                    return response.data.response as T; // Retourne un tableau vide
+                }
+
+                // Cas 3: Réponse inattendue, on réessaie
+                console.log(chalk.yellow(`      -> Réponse inattendue pour ${callName}, tentative ${attempts}/${MAX_API_ATTEMPTS}.`));
+                console.log(chalk.yellow(`         Contenu de la réponse inattendue:`), response.data);
+
+            } catch (error: any) {
+                console.log(chalk.yellow(`      -> Erreur API (tentative ${attempts}/${MAX_API_ATTEMPTS}) pour ${callName}: ${error.message}`));
             }
             if (attempts < MAX_API_ATTEMPTS) await sleep(1500);
         }
-        console.log(chalk.red(`      -> ERREUR FINALE: Échec de l'appel pour ${callName}`));
+        console.log(chalk.red(`      -> ERREUR FINALE: Échec de l'appel pour ${callName} après ${MAX_API_ATTEMPTS} tentatives.`));
         return null;
     }
 
@@ -64,6 +79,13 @@ class ApiFootballService {
         return this.requestWithRetry<any[]>(
             () => this.api.get('/odds', { params: { fixture: fixtureId } }),
             `Cotes pour match ${fixtureId}`
+        );
+    }
+
+    public async getFixtureResult(fixtureId: number): Promise<any | null> {
+        return this.requestWithRetry<any>(
+            () => this.api.get('/fixtures', { params: { id: fixtureId } }),
+            `Résultat pour match ${fixtureId}`
         );
     }
 }

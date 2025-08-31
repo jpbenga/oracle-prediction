@@ -4,6 +4,7 @@ const { LEAGUES_TO_ANALYZE } = require('../config/football.config');
 const { apiFootballService } = require('../services/ApiFootball.service');
 const { gestionJourneeService } = require('../services/GestionJournee.service');
 const { analyseMatchService } = require('../services/AnalyseMatch.service');
+process.env.FIRESTORE_EMULATOR_HOST = "localhost:8080";
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 

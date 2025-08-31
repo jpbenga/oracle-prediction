@@ -1,9 +1,11 @@
+process.env.FIRESTORE_EMULATOR_HOST = "localhost:8080";
+
 const chalk = require('chalk');
-const fs = require('fs');
 const { LEAGUES_TO_ANALYZE, LOW_OCCURRENCE_MARKETS } = require('../config/football.config');
 const { apiFootballService } = require('../services/ApiFootball.service');
 const { gestionJourneeService } = require('../services/GestionJournee.service');
 const { analyseMatchService } = require('../services/AnalyseMatch.service');
+const { firestoreService } = require('../services/Firestore.service');
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -65,18 +67,28 @@ function parseOdds(oddsData: any[]) {
     return parsed;
 }
 
-async function runPrediction() {
-    console.log(chalk.blue.bold("--- Démarrage du Job de Prédiction (Version Complète) ---"));
+async function runPrediction(options?: { leagueId?: string, matchdayNumber?: number }) {
+    console.log(chalk.blue.bold("--- Démarrage du Job de Prédiction ---"));
     const season = new Date().getFullYear();
-    const predictions: { [leagueName: string]: any[] } = {};
 
-    for (const league of LEAGUES_TO_ANALYZE) {
+    let leaguesToProcess = LEAGUES_TO_ANALYZE;
+    if (options?.leagueId) {
+        const specificLeague = LEAGUES_TO_ANALYZE.find((l: { id: string | undefined; }) => l.id === options.leagueId);
+        if (specificLeague) {
+            leaguesToProcess = [specificLeague];
+        } else {
+            console.log(chalk.red(`League with ID ${options.leagueId} not found in LEAGUES_TO_ANALYZE.`));
+            return;
+        }
+    }
+
+    for (const league of leaguesToProcess) {
         console.log(chalk.cyan.bold(`\n[Analyse de la ligue] ${league.name}`));
 
-        const upcomingMatches = await gestionJourneeService.getMatchesForPrediction(league.id, season);
+        const matchday = options?.matchdayNumber || season;
+        const upcomingMatches = await gestionJourneeService.getMatchesForPrediction(league.id, matchday);
         
         if (upcomingMatches && upcomingMatches.length > 0) {
-            predictions[league.name] = [];
             for (const match of upcomingMatches) {
                 console.log(chalk.green(`\n    Calcul pour : ${match.teams.home.name} vs ${match.teams.away.name}`));
                 const homeTeamId = match.teams.home.id;
@@ -99,9 +111,8 @@ async function runPrediction() {
                 let awayAvgAgainst = parseFloat(awayStats.goals?.against.average.total as string) || 0;
 
                 const matchesPlayed = homeStats.fixtures.played.total;
-                const isEarlySeason = matchesPlayed < 6;
-
-                if (isEarlySeason) {
+                
+                if (matchesPlayed < 6) {
                     console.log(chalk.yellow(`      -> Début de saison détecté (${matchesPlayed} matchs). Application des corrections.`));
                     const [prevHomeStats, prevAwayStats]: [TeamStats | null, TeamStats | null] = await Promise.all([
                         apiFootballService.getTeamStats(homeTeamId, league.id, season - 1),
@@ -159,40 +170,44 @@ async function runPrediction() {
                 }
                 
                 const parsedOdds = parseOdds(oddsData || []);
-                const fixtureDate = new Date(match.fixture.date);
-                const country = league.name.includes('(') ? league.name.match(/\(([^)]+)\)/)[1] : league.name;
+                
+                let savedCount = 0;
+                for (const market in confidenceScores) {
+                    const score = confidenceScores[market];
+                    if (score < 60) continue;
 
-                const leaguePredictions = predictions[league.name];
-                if (leaguePredictions) {
-                    leaguePredictions.push({
+                    const odd = parsedOdds[market];
+                    const status = odd ? 'ELIGIBLE' : 'INCOMPLETE';
+
+                    const predictionData = {
+                        fixtureId: match.fixture.id,
                         matchLabel: `${match.teams.home.name} vs ${match.teams.away.name}`,
-                        homeTeam: match.teams.home.name,
-                        awayTeam: match.teams.away.name,
-                        homeLogo: match.teams.home.logo,
-                        awayLogo: match.teams.away.logo,
-                        date: fixtureDate.toLocaleDateString('fr-FR'),
-                        time: fixtureDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
-                        league: league.name,
-                        country: country,
-                        scores: confidenceScores,
-                        odds: parsedOdds,
-                        isEarlySeason
-                    });
+                        matchDate: new Date(match.fixture.date).toISOString(),
+                        leagueId: league.id,
+                        market: market,
+                        score: score,
+                        odd: odd || null,
+                        status: status,
+                        createdAt: new Date().toISOString()
+                    };
+
+                    await firestoreService.savePrediction(predictionData);
+                    savedCount++;
                 }
                 
+                if (savedCount > 0) {
+                    console.log(chalk.magenta(`      -> ${savedCount} prédictions sauvegardées dans Firestore.`));
+                }
+
                 await sleep(500);
             }
         }
     }
     
-    try {
-        fs.writeFileSync('predictions_du_jour.json', JSON.stringify(predictions, null, 2));
-        console.log(chalk.magenta.bold('\n-> Prédictions sauvegardées dans le fichier predictions_du_jour.json'));
-    } catch (error) {
-        console.error(chalk.red('Erreur lors de la sauvegarde du fichier JSON:'), error);
-    }
-
     console.log(chalk.blue.bold("\n--- Job de Prédiction Terminé ---"));
 }
 
 module.exports = { runPrediction };
+
+// Lancer le job
+runPrediction();
