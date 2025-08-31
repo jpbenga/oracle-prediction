@@ -1,10 +1,14 @@
+process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
+
 const chalk = require('chalk');
-const fs = require('fs');
 const { LEAGUES_TO_ANALYZE } = require('../config/football.config');
 const { apiFootballService } = require('../services/ApiFootball.service');
 const { gestionJourneeService } = require('../services/GestionJournee.service');
 const { analyseMatchService } = require('../services/AnalyseMatch.service');
-process.env.FIRESTORE_EMULATOR_HOST = "localhost:8080";
+
+// DEBUG IMPORT FIRESTORE
+const firestoreModule = require('../services/Firestore.service');
+const { firestoreService } = firestoreModule;
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -68,20 +72,16 @@ function analyzeMatchMarkets(fixture: any, projectedHomeGoals: number, projected
     return results;
 }
 
-const initTrancheObject = () => ({
-    '0-59': { success: 0, total: 0, avgPredicted: 0 }, '60-69': { success: 0, total: 0, avgPredicted: 0 }, '70-79': { success: 0, total: 0, avgPredicted: 0 },
-    '80-89': { success: 0, total: 0, avgPredicted: 0 }, '90-100': { success: 0, total: 0, avgPredicted: 0 }
-});
-
 async function runBacktest() {
-    console.log(chalk.blue.bold("--- Démarrage du Job de Backtesting (Version Complète) ---"));
+    console.log(chalk.blue.bold("--- Démarrage du Job de Backtesting (Version Firestore) ---"));
+
+    if (!firestoreService) {
+        console.error(chalk.red('ERREUR CRITIQUE: firestoreService est undefined! Arrêt du job.'));
+        return;
+    }
+
     const season = new Date().getFullYear();
-    let detailedResults: any[] = [];
     let totalMatchesAnalyzed = 0;
-    let marketOccurrences: { [key: string]: number } = {};
-    let trancheAnalysis: { [key: string]: any } = {};
-    let earlySeasonTrancheSummary = initTrancheObject();
-    let calibrationReport: { [key: string]: any } = {};
 
     for (const league of LEAGUES_TO_ANALYZE) {
         console.log(chalk.cyan.bold(`\n[Analyse de la ligue] ${league.name}`));
@@ -103,8 +103,6 @@ async function runBacktest() {
                     console.log(chalk.red(`      -> Stats de base manquantes, match ignoré.`));
                     continue;
                 }
-
-                totalMatchesAnalyzed++;
 
                 let homeAvgFor = parseFloat(homeStats.goals?.for.average.total as string) || 0;
                 let homeAvgAgainst = parseFloat(homeStats.goals?.against.average.total as string) || 0;
@@ -157,40 +155,30 @@ async function runBacktest() {
                 };
 
                 const predictionResult = analyseMatchService.predict(lambdas, homeStats, awayStats, projectedHomeGoals, projectedAwayGoals);
-                let confidenceScores = predictionResult.markets;
+                const confidenceScores = predictionResult.markets;
 
                 const marketResults = analyzeMatchMarkets(match, projectedHomeGoals, projectedAwayGoals);
                 if (!marketResults) continue;
 
-                for (const market in marketResults) { if (marketResults[market] === true) { marketOccurrences[market] = (marketOccurrences[market] || 0) + 1; } }
+                totalMatchesAnalyzed++;
 
-                detailedResults.push({
-                    leagueName: league.name,
+                const backtestData = {
+                    fixtureId: match.fixture.id,
                     matchLabel: `${match.teams.home.name} vs ${match.teams.away.name}`,
-                    isEarlySeason,
-                    results: marketResults,
-                    scores: confidenceScores
-                });
+                    matchDate: new Date(match.fixture.date).toISOString(),
+                    leagueId: league.id,
+                    season: season,
+                    isEarlySeason: isEarlySeason,
+                    actualResults: marketResults,
+                    predictedScores: confidenceScores,
+                    createdAt: new Date().toISOString()
+                };
 
-                for (const market in confidenceScores) {
-                    if (!marketResults.hasOwnProperty(market)) continue;
-                    if (!trancheAnalysis[market]) trancheAnalysis[market] = initTrancheObject();
-                    const score = confidenceScores[market];
-                    const wasSuccess = marketResults[market];
-                    let trancheKey: '0-59' | '60-69' | '70-79' | '80-89' | '90-100';
-                    if (score < 60) trancheKey = '0-59';
-                    else if (score < 70) trancheKey = '60-69';
-                    else if (score < 80) trancheKey = '70-79';
-                    else if (score < 90) trancheKey = '80-89';
-                    else trancheKey = '90-100';
-                    trancheAnalysis[market][trancheKey].total++;
-                    trancheAnalysis[market][trancheKey].avgPredicted += score;
-                    if (wasSuccess) trancheAnalysis[market][trancheKey].success++;
-                    if (isEarlySeason) {
-                        earlySeasonTrancheSummary[trancheKey].total++;
-                        earlySeasonTrancheSummary[trancheKey].avgPredicted += score;
-                        if (wasSuccess) earlySeasonTrancheSummary[trancheKey].success++;
-                    }
+                if (firestoreService.saveBacktest) {
+                     await firestoreService.saveBacktest(backtestData);
+                     console.log(chalk.magenta(`      -> Résultat du backtest pour le match ${match.fixture.id} sauvegardé.`));
+                } else {
+                     console.log(chalk.yellow(`      -> ATTENTION: La méthode saveBacktest n'existe pas sur firestoreService. Données non sauvegardées.`));
                 }
 
                 await sleep(500);
@@ -198,51 +186,10 @@ async function runBacktest() {
         }
     }
 
-    try {
-        for (const market in trancheAnalysis) {
-            if ((marketOccurrences[market] || 0) < 20) {
-                delete trancheAnalysis[market];
-            }
-        }
-
-        const globalTrancheSummary = initTrancheObject();
-        for (const market in trancheAnalysis) {
-            for (const key in trancheAnalysis[market]) {
-                globalTrancheSummary[key as keyof typeof globalTrancheSummary].success += trancheAnalysis[market][key].success;
-                globalTrancheSummary[key as keyof typeof globalTrancheSummary].total += trancheAnalysis[market][key].total;
-                globalTrancheSummary[key as keyof typeof globalTrancheSummary].avgPredicted += trancheAnalysis[market][key].avgPredicted;
-            }
-        }
-        calibrationReport = {};
-        for (const market in trancheAnalysis) {
-            calibrationReport[market] = {};
-            for (const key in trancheAnalysis[market]) {
-                const tranche = trancheAnalysis[market][key];
-                if (tranche.total > 0) {
-                    tranche.avgPredicted /= tranche.total;
-                    calibrationReport[market][key] = {
-                        predicted: tranche.avgPredicted.toFixed(2),
-                        actual: ((tranche.success / tranche.total) * 100).toFixed(2)
-                    };
-                }
-            }
-        }
-
-        for (const key in earlySeasonTrancheSummary) {
-            const tranche = earlySeasonTrancheSummary[key as keyof typeof earlySeasonTrancheSummary];
-            if (tranche.total > 0) {
-                tranche.avgPredicted /= tranche.total;
-            }
-        }
-
-        const finalReport = { totalMatchesAnalyzed, globalSummary: globalTrancheSummary, perMarketSummary: trancheAnalysis, marketOccurrences, calibration: calibrationReport, earlySeasonSummary: earlySeasonTrancheSummary, detailedResults };
-        fs.writeFileSync('bilan_backtest.json', JSON.stringify(finalReport, null, 2));
-        console.log(chalk.magenta.bold('\n-> Bilan du backtest sauvegardé dans le fichier bilan_backtest.json'));
-    } catch (error) {
-        console.error(chalk.red('Erreur lors de la sauvegarde du fichier JSON:'), error);
-    }
-
+    console.log(chalk.blue.bold(`\n--- ${totalMatchesAnalyzed} matchs analysés ---`));
     console.log(chalk.blue.bold("\n--- Job de Backtesting Terminé ---"));
 }
+
+runBacktest();
 
 module.exports = { runBacktest };

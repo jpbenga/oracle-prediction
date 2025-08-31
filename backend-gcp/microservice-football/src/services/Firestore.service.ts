@@ -7,7 +7,6 @@ const chalk = require('chalk');
 if (!admin.apps.length) {
     if (process.env.FIRESTORE_EMULATOR_HOST) {
         console.log(chalk.yellow('      [Firestore] Connexion à l\'émulateur:', process.env.FIRESTORE_EMULATOR_HOST));
-        // Force IPv4 pour éviter les problèmes de connexion IPv6
         process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
         initializeApp();
     } else {
@@ -67,7 +66,6 @@ const firestoreService = {
     async savePrediction(predictionData: any) {
         console.log(chalk.blue('      [Firestore Service] Tentative de sauvegarde de la prédiction:'), predictionData.matchLabel);
         
-        // Test de connexion d'abord
         const isConnected = await this.testConnection();
         if (!isConnected) {
             console.error(chalk.red('      [Firestore Service] Impossible de se connecter à Firestore'));
@@ -79,7 +77,6 @@ const firestoreService = {
             const docRef = db.collection('predictions').doc();
             console.log(chalk.gray('      [Firestore Service] Document ID:'), docRef.id);
             
-            // Tentative de sauvegarde avec timeout réduit
             const savePromise = docRef.set(predictionData);
             const timeoutPromise = new Promise((_, reject) => 
                 setTimeout(() => reject(new Error('Timeout de 5 secondes atteint')), 5000)
@@ -96,6 +93,19 @@ const firestoreService = {
             } else {
                 console.error(chalk.red.bold('      [Firestore Service] ERREUR lors de la sauvegarde:'), error.message);
             }
+            return null;
+        }
+    },
+
+    async saveBacktest(backtestData: any) {
+        console.log(chalk.blue('      [Firestore Service] Tentative de sauvegarde du résultat de backtest:'), backtestData.matchLabel);
+        try {
+            const docRef = db.collection('backtests').doc();
+            await docRef.set(backtestData);
+            console.log(chalk.green.bold(`      [Firestore Service] SUCCÈS: Backtest ${docRef.id} sauvegardé.`));
+            return docRef.id;
+        } catch (error: any) {
+            console.error(chalk.red.bold('      [Firestore Service] ERREUR lors de la sauvegarde du backtest:'), error.message);
             return null;
         }
     },
