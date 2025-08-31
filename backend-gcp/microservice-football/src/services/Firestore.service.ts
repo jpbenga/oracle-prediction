@@ -6,10 +6,11 @@ const chalk = require('chalk');
 
 if (!admin.apps.length) {
     if (process.env.FIRESTORE_EMULATOR_HOST) {
-        // Emulator is running, no credentials needed
+        console.log(chalk.yellow('      [Firestore] Connexion à l\'émulateur:', process.env.FIRESTORE_EMULATOR_HOST));
+        // Force IPv4 pour éviter les problèmes de connexion IPv6
+        process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
         initializeApp();
     } else {
-        // Production environment, use service account
         try {
             const serviceAccount = require(path.resolve(__dirname, '../../../../firebase-service-account.json'));
             initializeApp({
@@ -17,7 +18,7 @@ if (!admin.apps.length) {
             });
         } catch (e) {
             console.error('Could not load service account. Make sure the file is present. Falling back to default credentials.', e);
-            initializeApp(); // Fallback for other GCP environments
+            initializeApp();
         }
     }
 }
@@ -25,6 +26,18 @@ if (!admin.apps.length) {
 const db = getFirestore();
 
 const firestoreService = {
+    async testConnection() {
+        try {
+            console.log(chalk.blue('      [Firestore] Test de connexion...'));
+            const testDoc = await db.collection('_test').doc('connection').get();
+            console.log(chalk.green('      [Firestore] Connexion OK'));
+            return true;
+        } catch (error: any) {
+            console.error(chalk.red('      [Firestore] Erreur de connexion:'), error.message);
+            return false;
+        }
+    },
+
     async getLeagueStatus(leagueId: any) {
         const docRef = db.collection('leagues_status').doc(leagueId);
         const doc = await docRef.get();
@@ -53,13 +66,36 @@ const firestoreService = {
 
     async savePrediction(predictionData: any) {
         console.log(chalk.blue('      [Firestore Service] Tentative de sauvegarde de la prédiction:'), predictionData.matchLabel);
+        
+        // Test de connexion d'abord
+        const isConnected = await this.testConnection();
+        if (!isConnected) {
+            console.error(chalk.red('      [Firestore Service] Impossible de se connecter à Firestore'));
+            return null;
+        }
+        
         try {
+            console.log(chalk.gray('      [Firestore Service] Création de la référence document...'));
             const docRef = db.collection('predictions').doc();
-            await docRef.set(predictionData);
+            console.log(chalk.gray('      [Firestore Service] Document ID:'), docRef.id);
+            
+            // Tentative de sauvegarde avec timeout réduit
+            const savePromise = docRef.set(predictionData);
+            const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Timeout de 5 secondes atteint')), 5000)
+            );
+            
+            await Promise.race([savePromise, timeoutPromise]);
+            
             console.log(chalk.green.bold(`      [Firestore Service] SUCCÈS: Prédiction ${docRef.id} sauvegardée.`));
             return docRef.id;
-        } catch (error) {
-            console.error(chalk.red.bold('      [Firestore Service] ERREUR lors de la sauvegarde:'), error);
+        } catch (error: any) {
+            if (error.message.includes('Timeout')) {
+                console.error(chalk.red.bold('      [Firestore Service] TIMEOUT: L\'émulateur Firestore ne répond pas'));
+                console.error(chalk.red.bold('      [Firestore Service] Vérifiez que l\'émulateur est démarré sur localhost:8080'));
+            } else {
+                console.error(chalk.red.bold('      [Firestore Service] ERREUR lors de la sauvegarde:'), error.message);
+            }
             return null;
         }
     },

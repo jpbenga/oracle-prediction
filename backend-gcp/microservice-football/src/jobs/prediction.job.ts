@@ -1,11 +1,19 @@
-process.env.FIRESTORE_EMULATOR_HOST = "localhost:8080";
+process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 
 const chalk = require('chalk');
 const { LEAGUES_TO_ANALYZE, LOW_OCCURRENCE_MARKETS } = require('../config/football.config');
 const { apiFootballService } = require('../services/ApiFootball.service');
 const { gestionJourneeService } = require('../services/GestionJournee.service');
 const { analyseMatchService } = require('../services/AnalyseMatch.service');
-const { firestoreService } = require('../services/Firestore.service');
+
+// DEBUG CRITIQUE - DOIT S'AFFICHER
+console.log(chalk.red.bold('========== DEBUG IMPORT FIRESTORE =========='));
+const firestoreModule = require('../services/Firestore.service');
+console.log('Module importé:', Object.keys(firestoreModule));
+console.log('firestoreService type:', typeof firestoreModule.firestoreService);
+const { firestoreService } = firestoreModule;
+console.log('Service final:', typeof firestoreService);
+console.log(chalk.red.bold('==============================================='));
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -69,6 +77,14 @@ function parseOdds(oddsData: any[]) {
 
 async function runPrediction(options?: { leagueId?: string, matchdayNumber?: number }) {
     console.log(chalk.blue.bold("--- Démarrage du Job de Prédiction ---"));
+    
+    // DEBUG: Vérification finale avant utilisation
+    console.log('DEBUG: firestoreService avant utilisation:', typeof firestoreService);
+    if (!firestoreService) {
+        console.error(chalk.red('ERREUR: firestoreService est undefined!'));
+        return;
+    }
+    
     const season = new Date().getFullYear();
 
     let leaguesToProcess = LEAGUES_TO_ANALYZE;
@@ -165,7 +181,7 @@ async function runPrediction(options?: { leagueId?: string, matchdayNumber?: num
 
                 const maxConfidence = Math.max(...Object.values(confidenceScores) as number[]);
                 if (maxConfidence < 60) {
-                    console.log(chalk.yellow(`      -> Match exclu : aucune prédiction avec confiance \u2265 60%.`));
+                    console.log(chalk.yellow(`      -> Match exclu : aucune prédiction avec confiance ≥ 60%.`));
                     continue;
                 }
                 
@@ -191,8 +207,13 @@ async function runPrediction(options?: { leagueId?: string, matchdayNumber?: num
                         createdAt: new Date().toISOString()
                     };
 
-                    await firestoreService.savePrediction(predictionData);
-                    savedCount++;
+                    console.log(chalk.blue('      [DEBUG] Avant savePrediction, firestoreService:', typeof firestoreService));
+                    if (firestoreService && firestoreService.savePrediction) {
+                        await firestoreService.savePrediction(predictionData);
+                        savedCount++;
+                    } else {
+                        console.error(chalk.red('      [ERREUR] firestoreService.savePrediction non disponible!'));
+                    }
                 }
                 
                 if (savedCount > 0) {
@@ -209,5 +230,4 @@ async function runPrediction(options?: { leagueId?: string, matchdayNumber?: num
 
 module.exports = { runPrediction };
 
-// Lancer le job
 runPrediction();

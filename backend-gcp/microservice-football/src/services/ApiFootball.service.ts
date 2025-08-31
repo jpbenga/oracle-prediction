@@ -1,5 +1,3 @@
-// backend-gcp/microservice-football/src/services/ApiFootball.service.ts
-
 const axios = require('axios');
 const chalk = require('chalk');
 const { API_HOST, API_KEY, MAX_API_ATTEMPTS } = require('../config/football.config');
@@ -21,36 +19,49 @@ class ApiFootballService {
         });
     }
 
-    private async requestWithRetry<T>(apiCall: () => Promise<any>, callName: string): Promise<T | null> {
+    private async requestWithRetry<T>(apiCall: () => Promise<any>, callName: string, expectArray: boolean = true): Promise<T | null> {
         let attempts = 0;
         while (attempts < MAX_API_ATTEMPTS) {
             attempts++;
             try {
-                console.log(chalk.gray(`      -> Appel API (tentative ${attempts}): ${callName}`));
+                console.log(chalk.gray(`       -> Appel API (tentative ${attempts}): ${callName}`));
                 const response = await apiCall();
+                const apiResponseData = response.data.response;
 
-                // Cas 1: Réponse valide avec des données
-                if (response.data && response.data.response && response.data.response.length > 0) {
-                    console.log(chalk.green(`      -> Succès API pour ${callName}`));
-                    return response.data.response as T;
+                if (expectArray && Array.isArray(apiResponseData)) {
+                     if (apiResponseData.length > 0) {
+                        console.log(chalk.green(`       -> Succès API pour ${callName} (tableau avec données)`));
+                        return apiResponseData as T;
+                     } else {
+                        console.log(chalk.cyan(`       -> Réponse API vide pour ${callName}, considéré comme un succès (tableau vide).`));
+                        return apiResponseData as T;
+                     }
                 }
 
-                // Cas 2: Réponse valide mais vide (ex: pas de stats pour une saison)
-                if (response.data && response.data.response && response.data.response.length === 0) {
-                    console.log(chalk.cyan(`      -> Réponse API vide pour ${callName}, considéré comme un succès (pas de données).`));
-                    return response.data.response as T; // Retourne un tableau vide
+                if (!expectArray && typeof apiResponseData === 'object' && apiResponseData !== null && !Array.isArray(apiResponseData)) {
+                    console.log(chalk.green(`       -> Succès API pour ${callName} (objet)`));
+                    return apiResponseData as T;
                 }
-
-                // Cas 3: Réponse inattendue, on réessaie
-                console.log(chalk.yellow(`      -> Réponse inattendue pour ${callName}, tentative ${attempts}/${MAX_API_ATTEMPTS}.`));
-                console.log(chalk.yellow(`         Contenu de la réponse inattendue:`), response.data);
+                
+                console.log(chalk.yellow(`       -> Réponse inattendue pour ${callName}, tentative ${attempts}/${MAX_API_ATTEMPTS}.`));
+                
+                // CORRECTION: Utilisation de util.inspect pour afficher correctement les objets imbriqués
+                const util = require('util');
+                console.log(chalk.yellow(`          Contenu de la réponse inattendue:`));
+                console.log(util.inspect(response.data, { 
+                    depth: null,        // Affiche tous les niveaux d'imbrication
+                    colors: true,       // Couleurs pour une meilleure lisibilité
+                    maxArrayLength: null, // Affiche tous les éléments des tableaux
+                    maxStringLength: null, // Affiche les chaînes complètes
+                    breakLength: 80     // Largeur d'affichage
+                }));
 
             } catch (error: any) {
-                console.log(chalk.yellow(`      -> Erreur API (tentative ${attempts}/${MAX_API_ATTEMPTS}) pour ${callName}: ${error.message}`));
+                console.log(chalk.yellow(`       -> Erreur API (tentative ${attempts}/${MAX_API_ATTEMPTS}) pour ${callName}: ${error.message}`));
             }
             if (attempts < MAX_API_ATTEMPTS) await sleep(1500);
         }
-        console.log(chalk.red(`      -> ERREUR FINALE: Échec de l'appel pour ${callName} après ${MAX_API_ATTEMPTS} tentatives.`));
+        console.log(chalk.red(`       -> ERREUR FINALE: Échec de l'appel pour ${callName} après ${MAX_API_ATTEMPTS} tentatives.`));
         return null;
     }
 
@@ -71,7 +82,8 @@ class ApiFootballService {
     public async getTeamStats(teamId: number, leagueId: number, season: number): Promise<any | null> {
         return this.requestWithRetry<any>(
             () => this.api.get('/teams/statistics', { params: { team: teamId, league: leagueId, season } }),
-            `Stats pour équipe ${teamId}`
+            `Stats pour équipe ${teamId}`,
+            false
         );
     }
 
