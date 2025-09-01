@@ -41,24 +41,24 @@ export interface Bet {
   odd: number;
   isEarlySeason: boolean;
   expectedValue: number;
-  profiles: ('Prudent' | 'Equilibre' | 'Audacieux')[];
   result?: 'Win' | 'Loss' | 'Pending';
 }
 
 export interface Ticket {
+  id: string;
   bets: Bet[];
   totalOdd: number;
-  profile: 'Prudent' | 'Equilibre' | 'Audacieux';
-  result?: 'Win' | 'Loss' | 'Pending';
+  title: "The Oracle's Choice" | "The Agent's Play" | "The Red Pill";
+  status: 'won' | 'lost' | 'pending';
 }
 
 // La réponse de l'API pour les tickets est un objet avec les dates comme clés,
-// puis les profils comme sous-clés.
+// puis les titres comme sous-clés.
 export interface TicketsApiResponse {
   [date: string]: {
-    Prudent?: Ticket[];
-    Equilibre?: Ticket[];
-    Audacieux?: Ticket[];
+    "The Oracle's Choice"?: Ticket[];
+    "The Agent's Play"?: Ticket[];
+    "The Red Pill"?: Ticket[];
   };
 }
 

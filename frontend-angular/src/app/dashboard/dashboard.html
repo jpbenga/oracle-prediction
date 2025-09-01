@@ -1,3 +1,4 @@
+
 <header class="p-4 border-b border-[#222] flex justify-between items-center">
   <h1 class="text-2xl font-bold text-[#00FF41]">The Oracle</h1>
   <button (click)="togglePremium()" 
@@ -26,14 +27,10 @@
 
   <!-- Data Display Container -->
   <div *ngIf="!isLoading && !error">
-    <!-- Section for Prediction List (moved here) -->
-    <div class="mb-12">
-      <app-predictions-list 
-        [allPredictions]="predictionsData" 
-        [dayOffset]="selectedDayOffset"
-        [isPremium]="isPremium">
-      </app-predictions-list>
-    </div>
+    <app-architects-simulator
+      [ticketsData]="ticketsData"
+      [selectedDayOffset]="selectedDayOffset">
+    </app-architects-simulator>
 
     <!-- Section for Tickets -->
     <div class="mb-12">
@@ -42,6 +39,15 @@
         [ticketsData]="ticketsData" 
         [selectedDayOffset]="selectedDayOffset">
       </app-tickets-list>
+    </div>
+
+    <!-- Section for Prediction List -->
+    <div class="mb-12">
+      <app-predictions-list 
+        [allPredictions]="predictionsData" 
+        [dayOffset]="selectedDayOffset"
+        [isPremium]="isPremium">
+      </app-predictions-list>
     </div>
   </div>
 </main>

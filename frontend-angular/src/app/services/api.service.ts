@@ -1,3 +1,4 @@
+
 import { Injectable } from '@angular/core';
 import { Observable, from } from 'rxjs';
 import { map } from 'rxjs/operators';
@@ -21,14 +22,19 @@ export class ApiService {
       map(tickets => {
         const groupedByDate: TicketsApiResponse = {};
         tickets.forEach(ticket => {
-          // Assumons que les tickets ont un champ 'date' ou 'creation_date'
-          // Pour l'exemple, nous utilisons une date statique si non disponible
-          const date = (ticket as any).date || new Date().toLocaleDateString('fr-FR');
+          const date = (ticket as any).creation_date.toDate().toLocaleDateString('fr-FR');
           if (!groupedByDate[date]) {
-            groupedByDate[date] = { Prudent: [], Equilibre: [], Audacieux: [] };
+            groupedByDate[date] = {};
           }
-          if (groupedByDate[date][ticket.profile]) {
-            groupedByDate[date][ticket.profile]!.push(ticket);
+          const title = ticket.title;
+          if (title === "The Oracle's Choice" || title === "The Agent's Play" || title === "The Red Pill") {
+            if (!groupedByDate[date][title]) {
+              groupedByDate[date][title] = [];
+            }
+            const ticketArray = groupedByDate[date][title];
+            if (ticketArray) {
+                ticketArray.push(ticket);
+            }
           }
         });
         return groupedByDate;

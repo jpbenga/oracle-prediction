@@ -6,6 +6,7 @@ import { DaySelector } from '../components/day-selector/day-selector';
 import { Paywall } from '../components/paywall/paywall';
 import { PredictionsList } from '../components/predictions-list/predictions-list';
 import { TicketsList } from '../components/tickets-list/tickets-list';
+import { ArchitectsSimulator } from '../components/architects-simulator/architects-simulator';
 import { PredictionsApiResponse, TicketsApiResponse } from '../types/api-types';
 
 @Component({
@@ -16,7 +17,8 @@ import { PredictionsApiResponse, TicketsApiResponse } from '../types/api-types';
     DaySelector,
     Paywall,
     PredictionsList,
-    TicketsList
+    TicketsList,
+    ArchitectsSimulator
   ],
   templateUrl: './dashboard.html',
   styleUrls: ['./dashboard.scss']
