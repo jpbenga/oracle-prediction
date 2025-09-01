@@ -1,34 +1,28 @@
-import { ApplicationConfig, provideZoneChangeDetection } from '@angular/core';
+import { ApplicationConfig } from '@angular/core';
 import { provideRouter } from '@angular/router';
-import { provideHttpClient } from '@angular/common/http';
 import { routes } from './app.routes';
 import { initializeApp, provideFirebaseApp } from '@angular/fire/app';
-import { getFirestore, provideFirestore, connectFirestoreEmulator } from '@angular/fire/firestore';
+import { getAuth, provideAuth } from '@angular/fire/auth';
+import { getFirestore, provideFirestore } from '@angular/fire/firestore';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import { authInterceptor } from './services/auth.interceptor';
 
-// NOTE: Using a placeholder config with the correct projectId.
-// This is sufficient for connecting to the local emulator.
+// TODO: Remplacez cet objet par votre propre configuration Firebase
 const firebaseConfig = {
-  projectId: "oracle-prediction-app",
-  apiKey: "DUMMY_API_KEY",
-  authDomain: "oracle-prediction-app.firebaseapp.com",
-  storageBucket: "oracle-prediction-app.appspot.com",
-  messagingSenderId: "DUMMY_SENDER_ID",
-  appId: "DUMMY_APP_ID"
+    apiKey: "AIza...",
+    authDomain: "votre-projet.firebaseapp.com",
+    projectId: "votre-projet",
+    storageBucket: "votre-projet.appspot.com",
+    messagingSenderId: "...",
+    appId: "..."
 };
 
 export const appConfig: ApplicationConfig = {
   providers: [
-    provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
-    provideHttpClient(),
+    provideHttpClient(withInterceptors([authInterceptor])),
     provideFirebaseApp(() => initializeApp(firebaseConfig)),
-    provideFirestore(() => {
-      const firestore = getFirestore();
-      // Connect to the emulator only in a local development environment
-      if (location.hostname === 'localhost') {
-        connectFirestoreEmulator(firestore, 'localhost', 8080);
-      }
-      return firestore;
-    }),
+    provideAuth(() => getAuth()),
+    provideFirestore(() => getFirestore())
   ]
 };

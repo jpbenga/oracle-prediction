@@ -1,9 +1,9 @@
-
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { forkJoin } from 'rxjs';
 import { ApiService } from '../services/api.service';
+import { AuthService } from '../services/auth.service';
 import { DaySelector } from '../components/day-selector/day-selector';
 import { Paywall } from '../components/paywall/paywall';
 import { PredictionsList } from '../components/predictions-list/predictions-list';
@@ -34,6 +34,8 @@ export class Dashboard implements OnInit {
   selectedDayOffset = 0;
   isPremium = false;
   showPaywall = false;
+
+  authService = inject(AuthService);
 
   constructor(private apiService: ApiService) {}
 

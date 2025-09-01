@@ -8,7 +8,6 @@ const chalk = require('chalk');
 if (!admin.apps.length) {
     if (process.env.FIRESTORE_EMULATOR_HOST) {
         console.log(chalk.yellow('      [Firestore] Connexion à l\'émulateur:', process.env.FIRESTORE_EMULATOR_HOST));
-        process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
         initializeApp();
     } else {
         try {
@@ -33,38 +32,42 @@ const firestoreService = {
             console.log(chalk.green('      [Firestore] Connexion OK'));
             return true;
         } catch (error) {
-            console.error(chalk.red('      [Firestore] Erreur de connexion:'), error.message);
+            if (error instanceof Error) {
+                console.error(chalk.red('      [Firestore] Erreur de connexion:'), error.message);
+            } else {
+                console.error(chalk.red('      [Firestore] Erreur de connexion:'), error);
+            }
             return false;
         }
     },
 
-    async getLeagueStatus(leagueId) {
+    async getLeagueStatus(leagueId: any) {
         const docRef = db.collection('leagues_status').doc(leagueId);
         const doc = await docRef.get();
         return doc.exists ? doc.data() : null;
     },
 
-    async updateLeagueStatus(leagueId, data) {
+    async updateLeagueStatus(leagueId: any, data: any) {
         const docRef = db.collection('leagues_status').doc(leagueId);
         await docRef.set(data, { merge: true });
     },
 
     async getAllLeaguesStatus() {
         const snapshot = await db.collection('leagues_status').get();
-        return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        return snapshot.docs.map((doc: { id: any; data: () => any; }) => ({ id: doc.id, ...doc.data() }));
     },
 
     async getIncompletePredictions() {
         const snapshot = await db.collection('predictions').where('status', '==', 'INCOMPLETE').get();
-        return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        return snapshot.docs.map((doc: { id: any; data: () => any; }) => ({ id: doc.id, ...doc.data() }));
     },
 
-    async updatePrediction(predictionId, data) {
+    async updatePrediction(predictionId: any, data: any) {
         const docRef = db.collection('predictions').doc(predictionId);
         await docRef.set(data, { merge: true });
     },
 
-    async savePrediction(predictionData) {
+    async savePrediction(predictionData: { matchLabel: any; }) {
         console.log(chalk.blue('      [Firestore Service] Tentative de sauvegarde de la prédiction:'), predictionData.matchLabel);
         
         const isConnected = await this.testConnection();
@@ -88,17 +91,21 @@ const firestoreService = {
             console.log(chalk.green.bold(`      [Firestore Service] SUCCÈS: Prédiction ${docRef.id} sauvegardée.`));
             return docRef.id;
         } catch (error) {
-            if (error.message.includes('Timeout')) {
-                console.error(chalk.red.bold('      [Firestore Service] TIMEOUT: L\'émulateur Firestore ne répond pas'));
-                console.error(chalk.red.bold('      [Firestore Service] Vérifiez que l\'émulateur est démarré sur localhost:8080'));
+            if (error instanceof Error) {
+                if (error.message.includes('Timeout')) {
+                    console.error(chalk.red.bold('      [Firestore Service] TIMEOUT: L\'émulateur Firestore ne répond pas'));
+                    console.error(chalk.red.bold('      [Firestore Service] Vérifiez que l\'émulateur est démarré sur localhost:8080'));
+                } else {
+                    console.error(chalk.red.bold('      [Firestore Service] ERREUR lors de la sauvegarde:'), error.message);
+                }
             } else {
-                console.error(chalk.red.bold('      [Firestore Service] ERREUR lors de la sauvegarde:'), error.message);
+                 console.error(chalk.red.bold('      [Firestore Service] ERREUR lors de la sauvegarde:'), error);
             }
             return null;
         }
     },
 
-    async saveBacktest(backtestData) {
+    async saveBacktest(backtestData: { matchLabel: any; }) {
         console.log(chalk.blue('      [Firestore Service] Tentative de sauvegarde du résultat de backtest:'), backtestData.matchLabel);
         try {
             const docRef = db.collection('backtests').doc();
@@ -106,12 +113,16 @@ const firestoreService = {
             console.log(chalk.green.bold(`      [Firestore Service] SUCCÈS: Backtest ${docRef.id} sauvegardé.`));
             return docRef.id;
         } catch (error) {
-            console.error(chalk.red.bold('      [Firestore Service] ERREUR lors de la sauvegarde du backtest:'), error.message);
+            if (error instanceof Error) {
+                console.error(chalk.red.bold('      [Firestore Service] ERREUR lors de la sauvegarde du backtest:'), error.message);
+            } else {
+                console.error(chalk.red.bold('      [Firestore Service] ERREUR lors de la sauvegarde du backtest:'), error);
+            }
             return null;
         }
     },
 
-    async deleteTicketsForDate(date) {
+    async deleteTicketsForDate(date: any) {
         const startDate = new Date(`${date}T00:00:00.000Z`);
         const endDate = new Date(`${date}T23:59:59.999Z`);
 
@@ -126,26 +137,38 @@ const firestoreService = {
         }
 
         const batch = db.batch();
-        snapshot.docs.forEach((doc) => batch.delete(doc.ref));
+        snapshot.docs.forEach((doc: { ref: any; }) => batch.delete(doc.ref));
         await batch.commit();
     },
 
-    async getEligiblePredictions(date) {
+    async getEligiblePredictions(date: any) {
         let query = db.collection('predictions').where('status', '==', 'ELIGIBLE');
         if (date) {
             query = query.where('matchDate', '>=', `${date}T00:00:00Z`).where('matchDate', '<=', `${date}T23:59:59Z`);
         }
         const snapshot = await query.get();
-        return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        return snapshot.docs.map((doc: { id: any; data: () => any; }) => ({ id: doc.id, ...doc.data() }));
     },
 
-    async getPredictionsForDate(date) {
+    async getPredictionsForDate(date: any) {
         let query = db.collection('predictions');
         if (date) {
             query = query.where('matchDate', '>=', `${date}T00:00:00Z`).where('matchDate', '<=', `${date}T23:59:59Z`);
         }
         const snapshot = await query.get();
-        return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        return snapshot.docs.map((doc: { id: any; data: () => any; }) => ({ id: doc.id, ...doc.data() }));
+    },
+
+    async getTicketsForDate(date: string) {
+        const startDate = new Date(`${date}T00:00:00.000Z`);
+        const endDate = new Date(`${date}T23:59:59.999Z`);
+
+        const snapshot = await db.collection('tickets')
+            .where('creation_date', '>=', startDate)
+            .where('creation_date', '<=', endDate)
+            .get();
+            
+        return snapshot.docs.map((doc: { id: any; data: () => any; }) => ({ id: doc.id, ...doc.data() }));
     },
 
     async getPendingPredictions() {
@@ -154,15 +177,15 @@ const firestoreService = {
             .where('status', '==', 'PENDING')
             .where('matchDate', '<', now)
             .get();
-        return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        return snapshot.docs.map((doc: { id: any; data: () => any; }) => ({ id: doc.id, ...doc.data() }));
     },
 
     async getPendingTickets() {
         const snapshot = await db.collection('tickets').where('status', '==', 'PENDING').get();
-        return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        return snapshot.docs.map((doc: { id: any; data: () => any; }) => ({ id: doc.id, ...doc.data() }));
     },
 
-    async updateTicket(ticketId, data) {
+    async updateTicket(ticketId: any, data: any) {
         const docRef = db.collection('tickets').doc(ticketId);
         await docRef.set(data, { merge: true });
     },
@@ -173,7 +196,11 @@ const firestoreService = {
             await admin.app().delete();
             console.log(chalk.green('      [Firestore] Connexion fermée.'));
         } catch (error) {
-            console.error(chalk.red('      [Firestore] Erreur lors de la fermeture de la connexion:'), error);
+            if (error instanceof Error) {
+                console.error(chalk.red('      [Firestore] Erreur lors de la fermeture de la connexion:'), error.message);
+            } else {
+                console.error(chalk.red('      [Firestore] Erreur lors de la fermeture de la connexion:'), error);
+            }
         }
     }
 };

@@ -1,5 +1,4 @@
 
-
 const chalk = require('chalk');
 const admin = require('firebase-admin');
 const { firestoreService } = require('../services/Firestore.service');
@@ -95,7 +94,7 @@ function getCombinations(array: Bet[], size: number): Bet[][] {
 async function runTicketGenerator(options?: { date?: string }) {
     console.log(chalk.blue.bold("--- Démarrage du Job de Génération de Tickets ---"));
 
-    const targetDate = options?.date || new Date().toISOString().split('T')[0];
+    const targetDate: string = options?.date ?? new Date().toISOString().split('T')[0];
 
     console.log(chalk.yellow(`Suppression des tickets PENDING existants pour le ${targetDate}...`));
     await firestoreService.deleteTicketsForDate(targetDate);
@@ -195,7 +194,11 @@ async function runTicketGenerator(options?: { date?: string }) {
         }
 
     } catch (error) {
-        console.error(chalk.red('Erreur lors de la sauvegarde des tickets dans Firestore:'), error);
+        if (error instanceof Error) {
+            console.error(chalk.red('Erreur lors de la sauvegarde des tickets dans Firestore:'), error.message);
+        } else {
+            console.error(chalk.red('Erreur lors de la sauvegarde des tickets dans Firestore:'), error);
+        }
     }
 
     console.log(chalk.blue.bold("\n--- Job de Génération de Tickets Terminé ---"));
