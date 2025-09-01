@@ -1,21 +1,11 @@
-process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
-
 const chalk = require('chalk');
 const { LEAGUES_TO_ANALYZE, LOW_OCCURRENCE_MARKETS } = require('../config/football.config');
 const { apiFootballService } = require('../services/ApiFootball.service');
 const { gestionJourneeService } = require('../services/GestionJournee.service');
 const { analyseMatchService } = require('../services/AnalyseMatch.service');
+const { firestoreService } = require('../services/Firestore.service');
 
-// DEBUG CRITIQUE - DOIT S'AFFICHER
-console.log(chalk.red.bold('========== DEBUG IMPORT FIRESTORE =========='));
-const firestoreModule = require('../services/Firestore.service');
-console.log('Module importé:', Object.keys(firestoreModule));
-console.log('firestoreService type:', typeof firestoreModule.firestoreService);
-const { firestoreService } = firestoreModule;
-console.log('Service final:', typeof firestoreService);
-console.log(chalk.red.bold('==============================================='));
-
-const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 interface TeamStats {
     fixtures: { played: { total: number } };
@@ -26,32 +16,32 @@ interface TeamStats {
     form: string;
 }
 
-function bayesianSmooth(avg: number, matchesPlayed: number, prior = 1.35, priorStrength = 5) {
+function bayesianSmooth(avg, matchesPlayed, prior = 1.35, priorStrength = 5) {
     if (matchesPlayed > 0 && matchesPlayed < 6) {
         return (avg * matchesPlayed + prior * priorStrength) / (matchesPlayed + priorStrength);
     }
     return avg;
 }
 
-function parseOdds(oddsData: any[]) {
+function parseOdds(oddsData) {
     if (!oddsData || oddsData.length === 0) return {};
-    const parsed: { [key: string]: number } = {};
+    const parsed = {};
     const fixtureOdds = oddsData[0];
     for (const bookmaker of fixtureOdds.bookmakers) {
-        const matchWinnerBet = bookmaker.bets.find((b: any) => b.id === 1);
-        const doubleChanceBet = bookmaker.bets.find((b: any) => b.id === 12);
+        const matchWinnerBet = bookmaker.bets.find((b) => b.id === 1);
+        const doubleChanceBet = bookmaker.bets.find((b) => b.id === 12);
         if (matchWinnerBet) {
-            const homeOdd = parseFloat(matchWinnerBet.values.find((v: any) => v.value === 'Home')?.odd);
-            const drawOdd = parseFloat(matchWinnerBet.values.find((v: any) => v.value === 'Draw')?.odd);
-            const awayOdd = parseFloat(matchWinnerBet.values.find((v: any) => v.value === 'Away')?.odd);
+            const homeOdd = parseFloat(matchWinnerBet.values.find((v) => v.value === 'Home')?.odd);
+            const drawOdd = parseFloat(matchWinnerBet.values.find((v) => v.value === 'Draw')?.odd);
+            const awayOdd = parseFloat(matchWinnerBet.values.find((v) => v.value === 'Away')?.odd);
             if (homeOdd && drawOdd && awayOdd) {
                 if (!parsed['draw']) parsed['draw'] = drawOdd;
                 const isHomeFavorite = homeOdd < awayOdd;
                 if (!parsed['favorite_win']) parsed['favorite_win'] = isHomeFavorite ? homeOdd : awayOdd;
                 if (!parsed['outsider_win']) parsed['outsider_win'] = isHomeFavorite ? awayOdd : homeOdd;
                 if (doubleChanceBet) {
-                    const homeDrawOdd = parseFloat(doubleChanceBet.values.find((v: any) => v.value === 'Home/Draw')?.odd);
-                    const awayDrawOdd = parseFloat(doubleChanceBet.values.find((v: any) => v.value === 'Draw/Away')?.odd);
+                    const homeDrawOdd = parseFloat(doubleChanceBet.values.find((v) => v.value === 'Home/Draw')?.odd);
+                    const awayDrawOdd = parseFloat(doubleChanceBet.values.find((v) => v.value === 'Draw/Away')?.odd);
                     if (homeDrawOdd && awayDrawOdd) {
                         if (!parsed['double_chance_favorite']) parsed['double_chance_favorite'] = isHomeFavorite ? homeDrawOdd : awayDrawOdd;
                         if (!parsed['double_chance_outsider']) parsed['double_chance_outsider'] = isHomeFavorite ? awayDrawOdd : homeDrawOdd;
@@ -61,27 +51,25 @@ function parseOdds(oddsData: any[]) {
         }
         for (const bet of bookmaker.bets) {
             switch (bet.id) {
-                case 5: bet.values.forEach((v: any) => { const k = `match_${v.value.toLowerCase().replace(' ', '_')}`; if (!parsed[k]) parsed[k] = parseFloat(v.odd); }); break;
-                case 8: bet.values.forEach((v: any) => { const k = v.value === 'Yes' ? 'btts' : 'btts_no'; if (!parsed[k]) parsed[k] = parseFloat(v.odd); }); break;
-                case 16: bet.values.forEach((v: any) => { const k = `home_${v.value.toLowerCase().replace(' ', '_')}`; if (!parsed[k]) parsed[k] = parseFloat(v.odd); }); break;
-                case 17: bet.values.forEach((v: any) => { const k = `away_${v.value.toLowerCase().replace(' ', '_')}`; if (!parsed[k]) parsed[k] = parseFloat(v.odd); }); break;
-                case 6: bet.values.forEach((v: any) => { const k = `ht_${v.value.toLowerCase().replace(' ', '_')}`; if (!parsed[k]) parsed[k] = parseFloat(v.odd); }); break;
-                case 26: bet.values.forEach((v: any) => { const k = `st_${v.value.toLowerCase().replace(' ', '_')}`; if (!parsed[k]) parsed[k] = parseFloat(v.odd); }); break;
-                case 105: bet.values.forEach((v: any) => { const k = `home_ht_${v.value.toLowerCase().replace(' ', '_')}`; if (!parsed[k]) parsed[k] = parseFloat(v.odd); }); break;
-                case 106: bet.values.forEach((v: any) => { const k = `away_ht_${v.value.toLowerCase().replace(' ', '_')}`; if (!parsed[k]) parsed[k] = parseFloat(v.odd); }); break;
+                case 5: bet.values.forEach((v) => { const k = `match_${v.value.toLowerCase().replace(' ', '_')}`; if (!parsed[k]) parsed[k] = parseFloat(v.odd); }); break;
+                case 8: bet.values.forEach((v) => { const k = v.value === 'Yes' ? 'btts' : 'btts_no'; if (!parsed[k]) parsed[k] = parseFloat(v.odd); }); break;
+                case 16: bet.values.forEach((v) => { const k = `home_${v.value.toLowerCase().replace(' ', '_')}`; if (!parsed[k]) parsed[k] = parseFloat(v.odd); }); break;
+                case 17: bet.values.forEach((v) => { const k = `away_${v.value.toLowerCase().replace(' ', '_')}`; if (!parsed[k]) parsed[k] = parseFloat(v.odd); }); break;
+                case 6: bet.values.forEach((v) => { const k = `ht_${v.value.toLowerCase().replace(' ', '_')}`; if (!parsed[k]) parsed[k] = parseFloat(v.odd); }); break;
+                case 26: bet.values.forEach((v) => { const k = `st_${v.value.toLowerCase().replace(' ', '_')}`; if (!parsed[k]) parsed[k] = parseFloat(v.odd); }); break;
+                case 105: bet.values.forEach((v) => { const k = `home_ht_${v.value.toLowerCase().replace(' ', '_')}`; if (!parsed[k]) parsed[k] = parseFloat(v.odd); }); break;
+                case 106: bet.values.forEach((v) => { const k = `away_ht_${v.value.toLowerCase().replace(' ', '_')}`; if (!parsed[k]) parsed[k] = parseFloat(v.odd); }); break;
             }
         }
     }
     return parsed;
 }
 
-async function runPrediction(options?: { leagueId?: string, matchdayNumber?: number }) {
-    console.log(chalk.blue.bold("--- Démarrage du Job de Prédiction ---"));
+async function runPrediction(options) {
+    console.info("--- Démarrage du Job de Prédiction ---");
     
-    // DEBUG: Vérification finale avant utilisation
-    console.log('DEBUG: firestoreService avant utilisation:', typeof firestoreService);
     if (!firestoreService) {
-        console.error(chalk.red('ERREUR: firestoreService est undefined!'));
+        console.error('ERREUR: firestoreService est undefined!');
         return;
     }
     
@@ -89,64 +77,64 @@ async function runPrediction(options?: { leagueId?: string, matchdayNumber?: num
 
     let leaguesToProcess = LEAGUES_TO_ANALYZE;
     if (options?.leagueId) {
-        const specificLeague = LEAGUES_TO_ANALYZE.find((l: { id: string | undefined; }) => l.id === options.leagueId);
+        const specificLeague = LEAGUES_TO_ANALYZE.find((l) => l.id === options.leagueId);
         if (specificLeague) {
             leaguesToProcess = [specificLeague];
         } else {
-            console.log(chalk.red(`League with ID ${options.leagueId} not found in LEAGUES_TO_ANALYZE.`));
+            console.error(`League with ID ${options.leagueId} not found in LEAGUES_TO_ANALYZE.`);
             return;
         }
     }
 
     for (const league of leaguesToProcess) {
-        console.log(chalk.cyan.bold(`\n[Analyse de la ligue] ${league.name}`));
+        console.info(`\n[Analyse de la ligue] ${league.name}`);
 
         const matchday = options?.matchdayNumber || season;
         const upcomingMatches = await gestionJourneeService.getMatchesForPrediction(league.id, matchday);
         
         if (upcomingMatches && upcomingMatches.length > 0) {
             for (const match of upcomingMatches) {
-                console.log(chalk.green(`\n    Calcul pour : ${match.teams.home.name} vs ${match.teams.away.name}`));
+                console.info(`\n    Calcul pour : ${match.teams.home.name} vs ${match.teams.away.name}`);
                 const homeTeamId = match.teams.home.id;
                 const awayTeamId = match.teams.away.id;
 
-                const [homeStats, awayStats, oddsData]: [TeamStats | null, TeamStats | null, any[] | null] = await Promise.all([
+                const [homeStats, awayStats, oddsData] = await Promise.all([
                     apiFootballService.getTeamStats(homeTeamId, league.id, season),
                     apiFootballService.getTeamStats(awayTeamId, league.id, season),
                     apiFootballService.getOddsForFixture(match.fixture.id)
                 ]);
 
                 if (!homeStats || !awayStats) {
-                    console.log(chalk.red(`      -> Stats de base manquantes, match ignoré.`));
+                    console.warn(`      -> Stats de base manquantes, match ignoré.`);
                     continue;
                 }
                 
-                let homeAvgFor = parseFloat(homeStats.goals?.for.average.total as string) || 0;
-                let homeAvgAgainst = parseFloat(homeStats.goals?.against.average.total as string) || 0;
-                let awayAvgFor = parseFloat(awayStats.goals?.for.average.total as string) || 0;
-                let awayAvgAgainst = parseFloat(awayStats.goals?.against.average.total as string) || 0;
+                let homeAvgFor = parseFloat(homeStats.goals?.for.average.total) || 0;
+                let homeAvgAgainst = parseFloat(homeStats.goals?.against.average.total) || 0;
+                let awayAvgFor = parseFloat(awayStats.goals?.for.average.total) || 0;
+                let awayAvgAgainst = parseFloat(awayStats.goals?.against.average.total) || 0;
 
                 const matchesPlayed = homeStats.fixtures.played.total;
                 
                 if (matchesPlayed < 6) {
-                    console.log(chalk.yellow(`      -> Début de saison détecté (${matchesPlayed} matchs). Application des corrections.`));
-                    const [prevHomeStats, prevAwayStats]: [TeamStats | null, TeamStats | null] = await Promise.all([
+                    console.info(`      -> Début de saison détecté (${matchesPlayed} matchs). Application des corrections.`);
+                    const [prevHomeStats, prevAwayStats] = await Promise.all([
                         apiFootballService.getTeamStats(homeTeamId, league.id, season - 1),
                         apiFootballService.getTeamStats(awayTeamId, league.id, season - 1)
                     ]);
 
                     let stabilityBoost = 1;
                     if (prevHomeStats?.goals && prevAwayStats?.goals) {
-                        const prevHomeAvgFor = parseFloat(prevHomeStats.goals.for.average.total as string) || homeAvgFor;
-                        const prevAwayAvgFor = parseFloat(prevAwayStats.goals.for.average.total as string) || awayAvgFor;
+                        const prevHomeAvgFor = parseFloat(prevHomeStats.goals.for.average.total) || homeAvgFor;
+                        const prevAwayAvgFor = parseFloat(prevAwayStats.goals.for.average.total) || awayAvgFor;
                         const homeStability = Math.abs(prevHomeAvgFor - homeAvgFor) < 0.5 ? 1.1 : 1;
                         const awayStability = Math.abs(prevAwayAvgFor - awayAvgFor) < 0.5 ? 1.1 : 1;
                         stabilityBoost = (homeStability + awayStability) / 2;
 
                         homeAvgFor = (0.8 * prevHomeAvgFor) + (0.2 * homeAvgFor);
-                        homeAvgAgainst = (0.8 * (parseFloat(prevHomeStats.goals.against.average.total as string) || homeAvgAgainst)) + (0.2 * homeAvgAgainst);
+                        homeAvgAgainst = (0.8 * (parseFloat(prevHomeStats.goals.against.average.total) || homeAvgAgainst)) + (0.2 * homeAvgAgainst);
                         awayAvgFor = (0.8 * prevAwayAvgFor) + (0.2 * awayAvgFor);
-                        awayAvgAgainst = (0.8 * (parseFloat(prevAwayStats.goals.against.average.total as string) || awayAvgAgainst)) + (0.2 * awayAvgAgainst);
+                        awayAvgAgainst = (0.8 * (parseFloat(prevAwayStats.goals.against.average.total) || awayAvgAgainst)) + (0.2 * awayAvgAgainst);
                     }
                     
                     homeAvgFor = bayesianSmooth(homeAvgFor, matchesPlayed) * stabilityBoost;
@@ -179,9 +167,9 @@ async function runPrediction(options?: { leagueId?: string, matchdayNumber?: num
                     }
                 }
 
-                const maxConfidence = Math.max(...Object.values(confidenceScores) as number[]);
+                const maxConfidence = Math.max(...Object.values(confidenceScores));
                 if (maxConfidence < 60) {
-                    console.log(chalk.yellow(`      -> Match exclu : aucune prédiction avec confiance ≥ 60%.`));
+                    console.warn(`      -> Match exclu : aucune prédiction avec confiance \u2265 60%.`);
                     continue;
                 }
                 
@@ -207,17 +195,16 @@ async function runPrediction(options?: { leagueId?: string, matchdayNumber?: num
                         createdAt: new Date().toISOString()
                     };
 
-                    console.log(chalk.blue('      [DEBUG] Avant savePrediction, firestoreService:', typeof firestoreService));
                     if (firestoreService && firestoreService.savePrediction) {
                         await firestoreService.savePrediction(predictionData);
                         savedCount++;
                     } else {
-                        console.error(chalk.red('      [ERREUR] firestoreService.savePrediction non disponible!'));
+                        console.error('      [ERREUR] firestoreService.savePrediction non disponible!');
                     }
                 }
                 
                 if (savedCount > 0) {
-                    console.log(chalk.magenta(`      -> ${savedCount} prédictions sauvegardées dans Firestore.`));
+                    console.info(`      -> ${savedCount} prédictions sauvegardées dans Firestore.`);
                 }
 
                 await sleep(500);
@@ -225,9 +212,8 @@ async function runPrediction(options?: { leagueId?: string, matchdayNumber?: num
         }
     }
     
-    console.log(chalk.blue.bold("\n--- Job de Prédiction Terminé ---"));
+    console.info("\n--- Job de Prédiction Terminé ---");
     
-    // Fermer la connexion Firestore pour permettre au script de se terminer
     if (firestoreService && firestoreService.closeConnection) {
         await firestoreService.closeConnection();
     }

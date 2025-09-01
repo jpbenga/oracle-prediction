@@ -1,3 +1,5 @@
+
+
 const express = require('express');
 const chalk = require('chalk');
 const fs = require('fs');
@@ -12,16 +14,46 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 
 // --- CONFIGURATION CORS SPÉCIFIQUE ---
+const allowedOrigins = [process.env.CORS_ORIGIN || 'http://localhost:4200'];
 const corsOptions = {
-    origin: 'http://localhost:4200', // Autoriser le frontend local
-    credentials: true, // Autoriser les cookies et les en-têtes d'authentification
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true,
     optionsSuccessStatus: 200
 };
 app.use(cors(corsOptions));
 
+// --- MIDDLEWARE D'AUTHENTIFICATION (PLACEHOLDER) ---
+const authenticate = (req, res, next) => {
+    // Ceci est un placeholder. Remplacez-le par une vraie validation de jeton JWT.
+    const token = req.headers.authorization;
 
-// --- ROUTE POUR TOUT ENCHAÎNER ---
-app.get('/run-all-jobs', (req: any, res: any) => {
+    if (!token) {
+        return res.status(401).json({ message: "Accès non autorisé. Jeton manquant." });
+    }
+
+    // À l'avenir, vous valideriez le jeton ici avec Firebase Admin SDK.
+    // admin.auth().verifyIdToken(token.split(' ')[1])
+    //   .then(decodedToken => {
+    //     req.user = decodedToken;
+    //     next();
+    //   })
+    //   .catch(error => {
+    //     res.status(403).json({ message: "Jeton invalide." });
+    //   });
+
+    console.log(chalk.yellow("Authentification (placeholder) : Jeton reçu. Passage autorisé."));
+    next();
+};
+
+
+// --- ROUTE POUR TOUT ENCHAÎNER (SÉCURISÉE) ---
+app.get('/run-all-jobs', authenticate, (req, res) => {
     res.status(202).json({ message: "La chaîne de jobs complète a été démarrée." });
     const runFullSequence = async () => {
         try {
@@ -36,8 +68,8 @@ app.get('/run-all-jobs', (req: any, res: any) => {
 });
 
 
-// --- ROUTE API POUR LE FRONTEND ---
-app.get('/api/tickets', (req: any, res: any) => {
+// --- ROUTES API PUBLIQUES POUR LE FRONTEND ---
+app.get('/api/tickets', (req, res) => {
     try {
         const filePath = path.join(__dirname, '..', 'tickets_du_jour.json');
         const data = fs.readFileSync(filePath, 'utf8');
@@ -47,8 +79,7 @@ app.get('/api/tickets', (req: any, res: any) => {
     }
 });
 
-// --- NOUVELLE ROUTE API POUR LES PRÉDICTIONS BRUTES ---
-app.get('/api/predictions', (req: any, res: any) => {
+app.get('/api/predictions', (req, res) => {
     try {
         const filePath = path.join(__dirname, '..', 'predictions_du_jour.json');
         const data = fs.readFileSync(filePath, 'utf8');
@@ -61,6 +92,6 @@ app.get('/api/predictions', (req: any, res: any) => {
 
 app.listen(PORT, () => {
     console.log(chalk.inverse(`\n🏈 Microservice Football démarré sur le port ${PORT}`));
-    console.log(chalk.cyan(`   API disponible sur http://localhost:${PORT}/api/tickets`));
-    console.log(chalk.magenta.bold(`   Pour tout lancer, visitez http://localhost:${PORT}/run-all-jobs`));
+    console.log(chalk.cyan(`   API publique sur http://localhost:${PORT}/api/tickets`));
+    console.log(chalk.magenta.bold(`   Endpoint sécurisé sur http://localhost:${PORT}/run-all-jobs`));
 });

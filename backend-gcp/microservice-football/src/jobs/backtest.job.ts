@@ -1,4 +1,4 @@
-process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
+
 
 const chalk = require('chalk');
 const { LEAGUES_TO_ANALYZE } = require('../config/football.config');
