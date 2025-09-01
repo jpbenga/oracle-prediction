@@ -1,5 +1,7 @@
+
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { RouterModule } from '@angular/router';
 import { forkJoin } from 'rxjs';
 import { ApiService } from '../services/api.service';
 import { DaySelector } from '../components/day-selector/day-selector';
@@ -14,6 +16,7 @@ import { PredictionsApiResponse, TicketsApiResponse } from '../types/api-types';
   standalone: true,
   imports: [
     CommonModule,
+    RouterModule,
     DaySelector,
     Paywall,
     PredictionsList,
