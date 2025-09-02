@@ -11,7 +11,10 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 
 // --- CONFIGURATION CORS SPÉCIFIQUE ---
-const allowedOrigins = [process.env.CORS_ORIGIN || 'http://localhost:4200'];
+const allowedOrigins = [
+    process.env.CORS_ORIGIN || 'http://localhost:4200',
+    'https://4200-firebase-oracle-prediction-1756797510260.cluster-64pjnskmlbaxowh5lzq6i7v4ra.cloudworkstations.dev' // <--- AJOUTEZ CETTE LIGNE
+];
 const corsOptions: cors.CorsOptions = {
     origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
         if (!origin || allowedOrigins.indexOf(origin) !== -1) {
