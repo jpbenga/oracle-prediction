@@ -1,25 +1,14 @@
 {
   "compilerOptions": {
-    "rootDir": "src",
-    "outDir": "dist",
-    "module": "esnext",
-    "target": "esnext",
-    "lib": ["es2020", "dom"],
-    "types": ["node"],
-    "moduleResolution": "node",
-    "sourceMap": true,
-    "declaration": true,
-    "declarationMap": true,
-    "noUncheckedIndexedAccess": true,
+    "target": "es2022",
+    "module": "commonjs", 
+    "outDir": "./dist",
+    "rootDir": "./src",
     "strict": true,
-    "verbatimModuleSyntax": true,
-    "isolatedModules": true,
-    "noUncheckedSideEffectImports": true,
-    "moduleDetection": "force",
-    "skipLibCheck": true,
     "esModuleInterop": true,
-    "resolveJsonModule": true,
-    "allowJs": true,
-    "noImplicitAny": true
-  }
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "**/*.spec.ts"]
 }
