@@ -1,7 +1,7 @@
 
-const chalk = require('chalk');
-const admin = require('firebase-admin');
-const { firestoreService } = require('../services/Firestore.service');
+import chalk from 'chalk';
+import admin from 'firebase-admin';
+import { firestoreService } from '../services/Firestore.service';
 
 if (admin.apps.length === 0) {
     admin.initializeApp();
@@ -91,10 +91,10 @@ function getCombinations(array: Bet[], size: number): Bet[][] {
     return result;
 }
 
-async function runTicketGenerator(options?: { date?: string }) {
+export async function runTicketGenerator(options: { date?: string } = {}) {
     console.log(chalk.blue.bold("--- Démarrage du Job de Génération de Tickets ---"));
 
-    const targetDate: string = options?.date ?? new Date().toISOString().split('T')[0];
+    const targetDate = (options.date || new Date().toISOString().split('T')[0]) as string;
 
     console.log(chalk.yellow(`Suppression des tickets PENDING existants pour le ${targetDate}...`));
     await firestoreService.deleteTicketsForDate(targetDate);

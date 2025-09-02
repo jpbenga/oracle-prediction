@@ -1,9 +1,9 @@
 
-const admin = require('firebase-admin');
-const { initializeApp, cert } = require('firebase-admin/app');
-const { getFirestore } = require('firebase-admin/firestore');
-const path = require('path');
-const chalk = require('chalk');
+import admin from 'firebase-admin';
+import { initializeApp, cert } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import path from 'path';
+import chalk from 'chalk';
 
 if (!admin.apps.length) {
     if (process.env.FIRESTORE_EMULATOR_HOST) {
@@ -24,11 +24,11 @@ if (!admin.apps.length) {
 
 const db = getFirestore();
 
-const firestoreService = {
-    async testConnection() {
+export const firestoreService = {
+    async testConnection(): Promise<boolean> {
         try {
             console.log(chalk.blue('      [Firestore] Test de connexion...'));
-            const testDoc = await db.collection('_test').doc('connection').get();
+            await db.collection('_test').doc('connection').get();
             console.log(chalk.green('      [Firestore] Connexion OK'));
             return true;
         } catch (error) {
@@ -41,33 +41,33 @@ const firestoreService = {
         }
     },
 
-    async getLeagueStatus(leagueId: any) {
+    async getLeagueStatus(leagueId: string): Promise<admin.firestore.DocumentData | null> {
         const docRef = db.collection('leagues_status').doc(leagueId);
         const doc = await docRef.get();
-        return doc.exists ? doc.data() : null;
+        return doc.exists ? doc.data()! : null;
     },
 
-    async updateLeagueStatus(leagueId: any, data: any) {
+    async updateLeagueStatus(leagueId: string, data: any): Promise<void> {
         const docRef = db.collection('leagues_status').doc(leagueId);
         await docRef.set(data, { merge: true });
     },
 
-    async getAllLeaguesStatus() {
+    async getAllLeaguesStatus(): Promise<any[]> {
         const snapshot = await db.collection('leagues_status').get();
-        return snapshot.docs.map((doc: { id: any; data: () => any; }) => ({ id: doc.id, ...doc.data() }));
+        return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     },
 
-    async getIncompletePredictions() {
+    async getIncompletePredictions(): Promise<any[]> {
         const snapshot = await db.collection('predictions').where('status', '==', 'INCOMPLETE').get();
-        return snapshot.docs.map((doc: { id: any; data: () => any; }) => ({ id: doc.id, ...doc.data() }));
+        return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     },
 
-    async updatePrediction(predictionId: any, data: any) {
+    async updatePrediction(predictionId: string, data: any): Promise<void> {
         const docRef = db.collection('predictions').doc(predictionId);
         await docRef.set(data, { merge: true });
     },
 
-    async savePrediction(predictionData: { matchLabel: any; }) {
+    async savePrediction(predictionData: { matchLabel: any; }): Promise<string | null> {
         console.log(chalk.blue('      [Firestore Service] Tentative de sauvegarde de la prédiction:'), predictionData.matchLabel);
         
         const isConnected = await this.testConnection();
@@ -105,7 +105,7 @@ const firestoreService = {
         }
     },
 
-    async saveBacktest(backtestData: { matchLabel: any; }) {
+    async saveBacktest(backtestData: { matchLabel: any; }): Promise<string | null> {
         console.log(chalk.blue('      [Firestore Service] Tentative de sauvegarde du résultat de backtest:'), backtestData.matchLabel);
         try {
             const docRef = db.collection('backtests').doc();
@@ -122,7 +122,7 @@ const firestoreService = {
         }
     },
 
-    async deleteTicketsForDate(date: any) {
+    async deleteTicketsForDate(date: string): Promise<void> {
         const startDate = new Date(`${date}T00:00:00.000Z`);
         const endDate = new Date(`${date}T23:59:59.999Z`);
 
@@ -137,29 +137,29 @@ const firestoreService = {
         }
 
         const batch = db.batch();
-        snapshot.docs.forEach((doc: { ref: any; }) => batch.delete(doc.ref));
+        snapshot.docs.forEach((doc) => batch.delete(doc.ref));
         await batch.commit();
     },
 
-    async getEligiblePredictions(date: any) {
-        let query = db.collection('predictions').where('status', '==', 'ELIGIBLE');
+    async getEligiblePredictions(date: string): Promise<any[]> {
+        let query: admin.firestore.Query = db.collection('predictions').where('status', '==', 'ELIGIBLE');
         if (date) {
             query = query.where('matchDate', '>=', `${date}T00:00:00Z`).where('matchDate', '<=', `${date}T23:59:59Z`);
         }
         const snapshot = await query.get();
-        return snapshot.docs.map((doc: { id: any; data: () => any; }) => ({ id: doc.id, ...doc.data() }));
+        return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     },
 
-    async getPredictionsForDate(date: any) {
-        let query = db.collection('predictions');
+    async getPredictionsForDate(date: string): Promise<any[]> {
+        let query: admin.firestore.Query = db.collection('predictions');
         if (date) {
             query = query.where('matchDate', '>=', `${date}T00:00:00Z`).where('matchDate', '<=', `${date}T23:59:59Z`);
         }
         const snapshot = await query.get();
-        return snapshot.docs.map((doc: { id: any; data: () => any; }) => ({ id: doc.id, ...doc.data() }));
+        return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     },
 
-    async getTicketsForDate(date: string) {
+    async getTicketsForDate(date: string): Promise<any[]> {
         const startDate = new Date(`${date}T00:00:00.000Z`);
         const endDate = new Date(`${date}T23:59:59.999Z`);
 
@@ -168,29 +168,29 @@ const firestoreService = {
             .where('creation_date', '<=', endDate)
             .get();
             
-        return snapshot.docs.map((doc: { id: any; data: () => any; }) => ({ id: doc.id, ...doc.data() }));
+        return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     },
 
-    async getPendingPredictions() {
+    async getPendingPredictions(): Promise<any[]> {
         const now = new Date().toISOString();
         const snapshot = await db.collection('predictions')
             .where('status', '==', 'PENDING')
             .where('matchDate', '<', now)
             .get();
-        return snapshot.docs.map((doc: { id: any; data: () => any; }) => ({ id: doc.id, ...doc.data() }));
+        return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     },
 
-    async getPendingTickets() {
+    async getPendingTickets(): Promise<any[]> {
         const snapshot = await db.collection('tickets').where('status', '==', 'PENDING').get();
-        return snapshot.docs.map((doc: { id: any; data: () => any; }) => ({ id: doc.id, ...doc.data() }));
+        return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     },
 
-    async updateTicket(ticketId: any, data: any) {
+    async updateTicket(ticketId: string, data: any): Promise<void> {
         const docRef = db.collection('tickets').doc(ticketId);
         await docRef.set(data, { merge: true });
     },
 
-    async closeConnection() {
+    async closeConnection(): Promise<void> {
         try {
             console.log(chalk.yellow('      [Firestore] Fermeture de la connexion...'));
             await admin.app().delete();

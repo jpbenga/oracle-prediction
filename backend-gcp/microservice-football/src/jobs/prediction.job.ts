@@ -65,7 +65,7 @@ function parseOdds(oddsData: any[]): { [key: string]: number } {
     return parsed;
 }
 
-async function runPrediction(options?: { leagueId?: string, matchdayNumber?: number }) {
+export async function runPrediction(options?: { leagueId?: string, matchdayNumber?: number }) {
     console.info("--- Démarrage du Job de Prédiction ---");
     
     if (!firestoreService) {

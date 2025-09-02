@@ -72,7 +72,7 @@ function analyzeMatchMarkets(fixture: any, projectedHomeGoals: number, projected
     return results;
 }
 
-async function runBacktest() {
+export async function runBacktest() {
     console.log(chalk.blue.bold("--- Démarrage du Job de Backtesting (Version Firestore) ---"));
 
     if (!firestoreService) {
