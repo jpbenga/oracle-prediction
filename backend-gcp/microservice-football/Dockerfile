@@ -1,4 +1,4 @@
-# Phase 1: Build - Compilation du TypeScript
+# Phase 1: Build -- Compilation du TypeScript
 FROM node:18-slim AS builder
 
 WORKDIR /usr/src/app
