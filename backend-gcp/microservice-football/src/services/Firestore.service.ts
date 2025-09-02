@@ -1,4 +1,3 @@
-
 import admin from 'firebase-admin';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
@@ -6,18 +5,24 @@ import path from 'path';
 import chalk from 'chalk';
 
 if (!admin.apps.length) {
-    if (process.env.FIRESTORE_EMULATOR_HOST) {
+    if (process.env.GCP_PROJECT || process.env.K_SERVICE) {
+        console.log(chalk.green('      [Firestore] Initialisation avec les identifiants Google Cloud par défaut.'));
+        initializeApp();
+    }
+    else if (process.env.FIRESTORE_EMULATOR_HOST) {
         console.log(chalk.yellow('      [Firestore] Connexion à l\'émulateur:', process.env.FIRESTORE_EMULATOR_HOST));
         initializeApp();
-    } else {
+    }
+    else {
         try {
+            console.log(chalk.blue('      [Firestore] Initialisation avec le fichier de compte de service local.'));
             const serviceAccount = require(path.resolve(__dirname, '../../../../firebase-service-account.json'));
             initializeApp({
                 credential: cert(serviceAccount)
             });
         } catch (e) {
-            console.error('Could not load service account. Make sure the file is present. Falling back to default credentials.', e);
-            initializeApp();
+            console.error(chalk.red.bold('      [Firestore] ERREUR CRITIQUE: Impossible de charger le fichier firebase-service-account.json pour le développement local.'));
+            process.exit(1);
         }
     }
 }
