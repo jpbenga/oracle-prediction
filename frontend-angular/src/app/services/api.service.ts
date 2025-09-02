@@ -1,65 +1,32 @@
-
 import { Injectable } from '@angular/core';
-import { Observable, from } from 'rxjs';
-import { map } from 'rxjs/operators';
-import { PredictionsApiResponse, TicketsApiResponse, Prediction, Ticket } from '../types/api-types';
-import { Firestore, collection, collectionData, getDocs } from '@angular/fire/firestore';
+import { HttpClient } from '@angular/common/http'; // 1. Importez HttpClient
+import { Observable } from 'rxjs';
+import { PredictionsApiResponse, TicketsApiResponse } from '../types/api-types';
 
 @Injectable({
   providedIn: 'root'
 })
 export class ApiService {
 
-  constructor(private firestore: Firestore) { }
+  // 2. Définissez l'URL de base de votre API déployée
+  private baseUrl = 'https://oracle-prediction-football-321557095918.europe-west1.run.app/api';
+
+  // 3. Injectez HttpClient dans le constructeur
+  constructor(private http: HttpClient) { }
 
   /**
-   * Récupère les tickets depuis la collection Firestore 'tickets'.
-   * Regroupe les tickets par date de création.
+   * Récupère les tickets depuis votre API backend.
    */
-  getTickets(): Observable<TicketsApiResponse> {
-    const ticketsCollection = collection(this.firestore, 'tickets');
-    return (collectionData(ticketsCollection, { idField: 'id' }) as Observable<Ticket[]>).pipe(
-      map(tickets => {
-        const groupedByDate: TicketsApiResponse = {};
-        tickets.forEach(ticket => {
-          const date = (ticket as any).creation_date.toDate().toLocaleDateString('fr-FR');
-          if (!groupedByDate[date]) {
-            groupedByDate[date] = {};
-          }
-          const title = ticket.title;
-          if (title === "The Oracle's Choice" || title === "The Agent's Play" || title === "The Red Pill") {
-            if (!groupedByDate[date][title]) {
-              groupedByDate[date][title] = [];
-            }
-            const ticketArray = groupedByDate[date][title];
-            if (ticketArray) {
-                ticketArray.push(ticket);
-            }
-          }
-        });
-        return groupedByDate;
-      })
-    );
+  getTickets(date?: string): Observable<TicketsApiResponse> {
+    const url = date ? `${this.baseUrl}/tickets?date=${date}` : `${this.baseUrl}/tickets`;
+    return this.http.get<TicketsApiResponse>(url);
   }
 
   /**
-   * Récupère les prédictions depuis la collection Firestore 'predictions'.
-   * Regroupe les prédictions par nom de ligue.
+   * Récupère les prédictions depuis votre API backend.
    */
-  getPredictions(): Observable<PredictionsApiResponse> {
-    const predictionsCollection = collection(this.firestore, 'predictions');
-    return (collectionData(predictionsCollection, { idField: 'id' }) as Observable<Prediction[]>).pipe(
-      map(predictions => {
-        const groupedByLeague: PredictionsApiResponse = {};
-        predictions.forEach(prediction => {
-          const league = prediction.leagueName;
-          if (!groupedByLeague[league]) {
-            groupedByLeague[league] = [];
-          }
-          groupedByLeague[league].push(prediction);
-        });
-        return groupedByLeague;
-      })
-    );
+  getPredictions(date?: string): Observable<PredictionsApiResponse> {
+    const url = date ? `${this.baseUrl}/predictions?date=${date}` : `${this.baseUrl}/predictions`;
+    return this.http.get<PredictionsApiResponse>(url);
   }
 }
