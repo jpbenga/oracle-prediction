@@ -1,6 +1,7 @@
-const axios = require('axios');
-const chalk = require('chalk');
-const { API_HOST, API_KEY, MAX_API_ATTEMPTS } = require('../config/football.config');
+import axios from 'axios';
+import chalk from 'chalk';
+import { API_HOST, API_KEY, MAX_API_ATTEMPTS } from '../config/football.config';
+import util from 'util';
 
 interface AxiosInstance {
     get(url: string, config?: any): Promise<any>;
@@ -45,8 +46,6 @@ class ApiFootballService {
                 
                 console.log(chalk.yellow(`       -> Réponse inattendue pour ${callName}, tentative ${attempts}/${MAX_API_ATTEMPTS}.`));
                 
-                // CORRECTION: Utilisation de util.inspect pour afficher correctement les objets imbriqués
-                const util = require('util');
                 console.log(chalk.yellow(`          Contenu de la réponse inattendue:`));
                 console.log(util.inspect(response.data, { 
                     depth: null,        // Affiche tous les niveaux d'imbrication
@@ -102,6 +101,4 @@ class ApiFootballService {
     }
 }
 
-const apiFootballService = new ApiFootballService();
-
-module.exports = { apiFootballService };
+export const apiFootballService = new ApiFootballService();

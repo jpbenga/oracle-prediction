@@ -1,20 +1,17 @@
 
 
-const chalk = require('chalk');
-const { LEAGUES_TO_ANALYZE } = require('../config/football.config');
-const { apiFootballService } = require('../services/ApiFootball.service');
-const { gestionJourneeService } = require('../services/GestionJournee.service');
-const { analyseMatchService } = require('../services/AnalyseMatch.service');
-
-// DEBUG IMPORT FIRESTORE
-const firestoreModule = require('../services/Firestore.service');
-const { firestoreService } = firestoreModule;
+import chalk from 'chalk';
+import { LEAGUES_TO_ANALYZE } from '../config/football.config';
+import { apiFootballService } from '../services/ApiFootball.service';
+import { gestionJourneeService } from '../services/GestionJournee.service';
+import { analyseMatchService } from '../services/AnalyseMatch.service';
+import { firestoreService } from '../services/Firestore.service';
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 interface TeamStats {
     fixtures: { played: { total: number } };
-    goals?: {
+    goals: {
         for: { average: { total: string | number } },
         against: { average: { total: string | number } }
     };
@@ -84,13 +81,15 @@ export async function runBacktest() {
     let totalMatchesAnalyzed = 0;
 
     for (const league of LEAGUES_TO_ANALYZE) {
-        console.log(chalk.cyan.bold(`\n[Analyse de la ligue] ${league.name}`));
+        console.log(chalk.cyan.bold(`
+[Analyse de la ligue] ${league.name}`));
 
         const finishedMatches = await gestionJourneeService.getMatchesForBacktesting(league.id, season);
 
         if (finishedMatches && finishedMatches.length > 0) {
             for (const match of finishedMatches) {
-                console.log(chalk.green(`\n    Analyse de : ${match.teams.home.name} vs ${match.teams.away.name}`));
+                console.log(chalk.green(`
+    Analyse de : ${match.teams.home.name} vs ${match.teams.away.name}`));
                 const homeTeamId = match.teams.home.id;
                 const awayTeamId = match.teams.away.id;
 
@@ -99,97 +98,93 @@ export async function runBacktest() {
                     apiFootballService.getTeamStats(awayTeamId, league.id, season)
                 ]);
 
-                if (!homeStats || !awayStats) {
-                    console.log(chalk.red(`      -> Stats de base manquantes, match ignoré.`));
-                    continue;
-                }
+                if (homeStats && awayStats && homeStats.goals && awayStats.goals) {
+                    let homeAvgFor = parseFloat(homeStats.goals.for.average.total as string) || 0;
+                    let homeAvgAgainst = parseFloat(homeStats.goals.against.average.total as string) || 0;
+                    let awayAvgFor = parseFloat(awayStats.goals.for.average.total as string) || 0;
+                    let awayAvgAgainst = parseFloat(awayStats.goals.against.average.total as string) || 0;
 
-                let homeAvgFor = parseFloat(homeStats.goals?.for.average.total as string) || 0;
-                let homeAvgAgainst = parseFloat(homeStats.goals?.against.average.total as string) || 0;
-                let awayAvgFor = parseFloat(awayStats.goals?.for.average.total as string) || 0;
-                let awayAvgAgainst = parseFloat(awayStats.goals?.against.average.total as string) || 0;
+                    const matchesPlayed = homeStats.fixtures.played.total;
+                    const isEarlySeason = matchesPlayed < 6;
 
-                const matchesPlayed = homeStats.fixtures.played.total;
-                const isEarlySeason = matchesPlayed < 6;
+                    if (isEarlySeason) {
+                        console.log(chalk.yellow(`      -> Début de saison détecté (${matchesPlayed} matchs). Application des corrections.`));
+                        const [prevHomeStats, prevAwayStats]: [TeamStats | null, TeamStats | null] = await Promise.all([
+                            apiFootballService.getTeamStats(homeTeamId, league.id, season - 1),
+                            apiFootballService.getTeamStats(awayTeamId, league.id, season - 1)
+                        ]);
 
-                if (isEarlySeason) {
-                    console.log(chalk.yellow(`      -> Début de saison détecté (${matchesPlayed} matchs). Application des corrections.`));
-                    const [prevHomeStats, prevAwayStats]: [TeamStats | null, TeamStats | null] = await Promise.all([
-                        apiFootballService.getTeamStats(homeTeamId, league.id, season - 1),
-                        apiFootballService.getTeamStats(awayTeamId, league.id, season - 1)
-                    ]);
+                        let stabilityBoost = 1;
+                        if (prevHomeStats?.goals && prevAwayStats?.goals) {
+                            const prevHomeAvgFor = parseFloat(prevHomeStats.goals.for.average.total as string) || homeAvgFor;
+                            const prevAwayAvgFor = parseFloat(prevAwayStats.goals.for.average.total as string) || awayAvgFor;
+                            const homeStability = Math.abs(prevHomeAvgFor - homeAvgFor) < 0.5 ? 1.1 : 1;
+                            const awayStability = Math.abs(prevAwayAvgFor - awayAvgFor) < 0.5 ? 1.1 : 1;
+                            stabilityBoost = (homeStability + awayStability) / 2;
 
-                    let stabilityBoost = 1;
-                    if (prevHomeStats?.goals && prevAwayStats?.goals) {
-                        const prevHomeAvgFor = parseFloat(prevHomeStats.goals.for.average.total as string) || homeAvgFor;
-                        const prevAwayAvgFor = parseFloat(prevAwayStats.goals.for.average.total as string) || awayAvgFor;
-                        const homeStability = Math.abs(prevHomeAvgFor - homeAvgFor) < 0.5 ? 1.1 : 1;
-                        const awayStability = Math.abs(prevAwayAvgFor - awayAvgFor) < 0.5 ? 1.1 : 1;
-                        stabilityBoost = (homeStability + awayStability) / 2;
+                            homeAvgFor = (0.8 * prevHomeAvgFor) + (0.2 * homeAvgFor);
+                            homeAvgAgainst = (0.8 * (parseFloat(prevHomeStats.goals.against.average.total as string) || homeAvgAgainst)) + (0.2 * homeAvgAgainst);
+                            awayAvgFor = (0.8 * prevAwayAvgFor) + (0.2 * awayAvgFor);
+                            awayAvgAgainst = (0.8 * (parseFloat(prevAwayStats.goals.against.average.total as string) || awayAvgAgainst)) + (0.2 * awayAvgAgainst);
+                        }
 
-                        homeAvgFor = (0.8 * prevHomeAvgFor) + (0.2 * homeAvgFor);
-                        homeAvgAgainst = (0.8 * (parseFloat(prevHomeStats.goals.against.average.total as string) || homeAvgAgainst)) + (0.2 * homeAvgAgainst);
-                        awayAvgFor = (0.8 * prevAwayAvgFor) + (0.2 * awayAvgFor);
-                        awayAvgAgainst = (0.8 * (parseFloat(prevAwayStats.goals.against.average.total as string) || awayAvgAgainst)) + (0.2 * awayAvgAgainst);
+                        homeAvgFor = bayesianSmooth(homeAvgFor, matchesPlayed) * stabilityBoost;
+                        homeAvgAgainst = bayesianSmooth(homeAvgAgainst, matchesPlayed) * stabilityBoost;
+                        awayAvgFor = bayesianSmooth(awayAvgFor, matchesPlayed) * stabilityBoost;
+                        awayAvgAgainst = bayesianSmooth(awayAvgAgainst, matchesPlayed) * stabilityBoost;
                     }
 
-                    homeAvgFor = bayesianSmooth(homeAvgFor, matchesPlayed) * stabilityBoost;
-                    homeAvgAgainst = bayesianSmooth(homeAvgAgainst, matchesPlayed) * stabilityBoost;
-                    awayAvgFor = bayesianSmooth(awayAvgFor, matchesPlayed) * stabilityBoost;
-                    awayAvgAgainst = bayesianSmooth(awayAvgAgainst, matchesPlayed) * stabilityBoost;
+                    const projectedHomeGoals = (homeAvgFor + awayAvgAgainst) / 2;
+                    const projectedAwayGoals = (awayAvgFor + homeAvgAgainst) / 2;
+
+                    const lambdaBoost = matchesPlayed >= 6 ? 1.1 : 1;
+                    const lambdas = {
+                        home: projectedHomeGoals * lambdaBoost,
+                        away: projectedAwayGoals * lambdaBoost,
+                        ht: ((projectedHomeGoals + projectedAwayGoals) * 0.45) * lambdaBoost,
+                        st: ((projectedHomeGoals + projectedAwayGoals) * 0.55) * lambdaBoost,
+                        home_ht: (projectedHomeGoals * 0.45) * lambdaBoost,
+                        home_st: (projectedHomeGoals * 0.55) * lambdaBoost,
+                        away_ht: (projectedAwayGoals * 0.45) * lambdaBoost,
+                        away_st: (projectedAwayGoals * 0.55) * lambdaBoost
+                    };
+
+                    const predictionResult = analyseMatchService.predict(lambdas, homeStats, awayStats, projectedHomeGoals, projectedAwayGoals);
+                    const confidenceScores = predictionResult.markets;
+
+                    const marketResults = analyzeMatchMarkets(match, projectedHomeGoals, projectedAwayGoals);
+                    if (!marketResults) continue;
+
+                    totalMatchesAnalyzed++;
+
+                    const backtestData = {
+                        fixtureId: match.fixture.id,
+                        matchLabel: `${match.teams.home.name} vs ${match.teams.away.name}`,
+                        matchDate: new Date(match.fixture.date).toISOString(),
+                        leagueId: league.id,
+                        season: season,
+                        isEarlySeason: isEarlySeason,
+                        actualResults: marketResults,
+                        predictedScores: confidenceScores,
+                        createdAt: new Date().toISOString()
+                    };
+
+                    if (firestoreService.saveBacktest) {
+                         await firestoreService.saveBacktest(backtestData);
+                         console.log(chalk.magenta(`      -> Résultat du backtest pour le match ${match.fixture.id} sauvegardé.`));
+                    } else {
+                         console.log(chalk.yellow(`      -> ATTENTION: La méthode saveBacktest n'existe pas sur firestoreService. Données non sauvegardées.`));
+                    }
+
+                    await sleep(500);
                 }
-
-                const projectedHomeGoals = (homeAvgFor + awayAvgAgainst) / 2;
-                const projectedAwayGoals = (awayAvgFor + homeAvgAgainst) / 2;
-
-                const lambdaBoost = matchesPlayed >= 6 ? 1.1 : 1;
-                const lambdas = {
-                    home: projectedHomeGoals * lambdaBoost,
-                    away: projectedAwayGoals * lambdaBoost,
-                    ht: ((projectedHomeGoals + projectedAwayGoals) * 0.45) * lambdaBoost,
-                    st: ((projectedHomeGoals + projectedAwayGoals) * 0.55) * lambdaBoost,
-                    home_ht: (projectedHomeGoals * 0.45) * lambdaBoost,
-                    home_st: (projectedHomeGoals * 0.55) * lambdaBoost,
-                    away_ht: (projectedAwayGoals * 0.45) * lambdaBoost,
-                    away_st: (projectedAwayGoals * 0.55) * lambdaBoost
-                };
-
-                const predictionResult = analyseMatchService.predict(lambdas, homeStats, awayStats, projectedHomeGoals, projectedAwayGoals);
-                const confidenceScores = predictionResult.markets;
-
-                const marketResults = analyzeMatchMarkets(match, projectedHomeGoals, projectedAwayGoals);
-                if (!marketResults) continue;
-
-                totalMatchesAnalyzed++;
-
-                const backtestData = {
-                    fixtureId: match.fixture.id,
-                    matchLabel: `${match.teams.home.name} vs ${match.teams.away.name}`,
-                    matchDate: new Date(match.fixture.date).toISOString(),
-                    leagueId: league.id,
-                    season: season,
-                    isEarlySeason: isEarlySeason,
-                    actualResults: marketResults,
-                    predictedScores: confidenceScores,
-                    createdAt: new Date().toISOString()
-                };
-
-                if (firestoreService.saveBacktest) {
-                     await firestoreService.saveBacktest(backtestData);
-                     console.log(chalk.magenta(`      -> Résultat du backtest pour le match ${match.fixture.id} sauvegardé.`));
-                } else {
-                     console.log(chalk.yellow(`      -> ATTENTION: La méthode saveBacktest n'existe pas sur firestoreService. Données non sauvegardées.`));
-                }
-
-                await sleep(500);
             }
-        }
     }
 
-    console.log(chalk.blue.bold(`\n--- ${totalMatchesAnalyzed} matchs analysés ---`));
-    console.log(chalk.blue.bold("\n--- Job de Backtesting Terminé ---"));
+    console.log(chalk.blue.bold(`
+--- ${totalMatchesAnalyzed} matchs analysés ---`));
+    console.log(chalk.blue.bold("--- Job de Backtesting Terminé ---"));
 }
 
 runBacktest();
-
-module.exports = { runBacktest };
+}

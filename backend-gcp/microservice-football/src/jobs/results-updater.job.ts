@@ -1,8 +1,8 @@
 
 
-const chalk = require('chalk');
-const { firestoreService } = require('../services/Firestore.service');
-const { apiFootballService } = require('../services/ApiFootball.service');
+import chalk from 'chalk';
+import { firestoreService } from '../services/Firestore.service';
+import { apiFootballService } from '../services/ApiFootball.service';
 
 async function runResultsUpdater() {
   console.log(chalk.blue.bold("--- Démarrage du Job de Mise à Jour des Résultats ---"));
@@ -101,5 +101,3 @@ function determinePredictionStatus(prediction: { market: string; odd: any; }, ma
 }
 
 runResultsUpdater();
-
-module.exports = { runResultsUpdater };

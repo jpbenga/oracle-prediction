@@ -1,7 +1,5 @@
-// backend-gcp/microservice-football/src/services/AnalyseMatch.service.ts
-
-const chalk = require('chalk');
-const { apiFootballService } = require('./ApiFootball.service');
+import chalk from 'chalk';
+import { apiFootballService } from './ApiFootball.service';
 
 // Définition des types pour clarifier le code
 interface TeamStats {
@@ -136,6 +134,4 @@ class AnalyseMatchService {
     }
 }
 
-const analyseMatchService = new AnalyseMatchService();
-
-module.exports = { analyseMatchService };
+export const analyseMatchService = new AnalyseMatchService();

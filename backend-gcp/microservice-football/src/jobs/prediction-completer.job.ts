@@ -1,9 +1,9 @@
 
 
-const chalk = require('chalk');
-const { firestoreService } = require('../services/Firestore.service');
-const { apiFootballService } = require('../services/ApiFootball.service');
-const { runTicketGenerator } = require('./ticket-generator.job');
+import chalk from 'chalk';
+import { firestoreService } from '../services/Firestore.service';
+import { apiFootballService } from '../services/ApiFootball.service';
+import { runTicketGenerator } from './ticket-generator.job';
 
 function parseOdds(oddsData: any[]) {
     if (!oddsData || oddsData.length === 0) return {};
@@ -59,7 +59,8 @@ async function runPredictionCompleter() {
     const updatedDates: { [date: string]: boolean } = {};
 
     for (const prediction of incompletePredictions) {
-        console.log(chalk.cyan(`\n[Complétion] Traitement de la prédiction : ${prediction.matchLabel} (ID: ${prediction.id})`));
+        console.log(chalk.cyan(`
+[Complétion] Traitement de la prédiction : ${prediction.matchLabel} (ID: ${prediction.id})`));
         
         const oddsData = await apiFootballService.getOddsForFixture(prediction.fixtureId);
         if (oddsData && oddsData.length > 0) {
@@ -103,7 +104,8 @@ async function runPredictionCompleter() {
 
     const datesToGenerate = Object.keys(updatedDates);
     if (datesToGenerate.length > 0) {
-        console.log(chalk.magenta.bold(`\n-> Des prédictions ont été complétées. Déclenchement du ticket-generator pour les dates: ${datesToGenerate.join(', ')}`));
+        console.log(chalk.magenta.bold(`
+-> Des prédictions ont été complétées. Déclenchement du ticket-generator pour les dates: ${datesToGenerate.join(', ')}`));
         for (const date of datesToGenerate) {
             await runTicketGenerator({ date });
         }
@@ -111,8 +113,6 @@ async function runPredictionCompleter() {
 
     console.log(chalk.blue.bold("--- Job de Complétion des Prédictions Terminé ---"));
 }
-
-module.exports = { runPredictionCompleter };
 
 // Lancer le job
 runPredictionCompleter();

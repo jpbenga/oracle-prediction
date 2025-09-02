@@ -1,7 +1,5 @@
-// backend-gcp/microservice-football/src/services/GestionJournee.service.ts
-
-const chalk = require('chalk');
-const { apiFootballService } = require('./ApiFootball.service');
+import chalk from 'chalk';
+import { apiFootballService } from './ApiFootball.service';
 
 class GestionJourneeService {
 
@@ -13,15 +11,19 @@ class GestionJourneeService {
         }
 
         const currentRoundName = rounds[0];
+        if (!currentRoundName) {
+            console.log(chalk.gray(`      -> Nom de journée invalide.`));
+            return null;
+        }
         
         // CORRECTION : Utilisation de la logique de parsing originale et robuste
         const roundParts = currentRoundName.match(/(\D+)(\d+)/);
-        if (!roundParts || parseInt(roundParts[2], 10) <= 1) {
+        if (!roundParts || !roundParts[2] || parseInt(roundParts[2], 10) <= 1) {
             console.log(chalk.gray(`      -> Pas de journée N-1 à analyser.`));
             return null;
         }
         
-        const prefix = roundParts[1].trim();
+        const prefix = roundParts[1]?.trim();
         const previousRoundNumber = parseInt(roundParts[2], 10) - 1;
         const previousRoundName = `${prefix} ${previousRoundNumber}`;
         
@@ -45,6 +47,10 @@ class GestionJourneeService {
         if (!rounds || rounds.length === 0) return [];
 
         const currentRoundName = rounds[0];
+        if (!currentRoundName) {
+            console.log(chalk.gray(`      -> Nom de journée invalide.`));
+            return [];
+        }
         console.log(chalk.green(`      -> Journée actuelle identifiée : "${currentRoundName}"`));
 
         const fixtures = await apiFootballService.getFixturesByRound(leagueId, season, currentRoundName);
@@ -57,5 +63,4 @@ class GestionJourneeService {
     }
 }
 
-const gestionJourneeService = new GestionJourneeService();
-module.exports = { gestionJourneeService };
+export const gestionJourneeService = new GestionJourneeService();

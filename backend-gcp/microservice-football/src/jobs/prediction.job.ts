@@ -1,15 +1,15 @@
-const chalk = require('chalk');
-const { LEAGUES_TO_ANALYZE, LOW_OCCURRENCE_MARKETS } = require('../config/football.config');
-const { apiFootballService } = require('../services/ApiFootball.service');
-const { gestionJourneeService } = require('../services/GestionJournee.service');
-const { analyseMatchService } = require('../services/AnalyseMatch.service');
-const { firestoreService } = require('../services/Firestore.service');
+import chalk from 'chalk';
+import { LEAGUES_TO_ANALYZE, LOW_OCCURRENCE_MARKETS } from '../config/football.config';
+import { apiFootballService } from '../services/ApiFootball.service';
+import { gestionJourneeService } from '../services/GestionJournee.service';
+import { analyseMatchService } from '../services/AnalyseMatch.service';
+import { firestoreService } from '../services/Firestore.service';
 
 const sleep = (ms: number | undefined) => new Promise(resolve => setTimeout(resolve, ms));
 
 interface TeamStats {
     fixtures: { played: { total: number } };
-    goals?: {
+    goals: {
         for: { average: { total: string | number } },
         against: { average: { total: string | number } }
     };
@@ -77,7 +77,7 @@ export async function runPrediction(options?: { leagueId?: string, matchdayNumbe
 
     let leaguesToProcess = LEAGUES_TO_ANALYZE;
     if (options?.leagueId) {
-        const specificLeague = LEAGUES_TO_ANALYZE.find((l: { id: string | undefined; }) => l.id === options.leagueId);
+        const specificLeague = LEAGUES_TO_ANALYZE.find((l) => l.id === parseInt(options.leagueId || '', 10));
         if (specificLeague) {
             leaguesToProcess = [specificLeague];
         } else {
@@ -87,14 +87,16 @@ export async function runPrediction(options?: { leagueId?: string, matchdayNumbe
     }
 
     for (const league of leaguesToProcess) {
-        console.info(`\n[Analyse de la ligue] ${league.name}`);
+        console.info(`
+[Analyse de la ligue] ${league.name}`);
 
         const matchday = options?.matchdayNumber || season;
         const upcomingMatches = await gestionJourneeService.getMatchesForPrediction(league.id, matchday);
         
         if (upcomingMatches && upcomingMatches.length > 0) {
             for (const match of upcomingMatches) {
-                console.info(`\n    Calcul pour : ${match.teams.home.name} vs ${match.teams.away.name}`);
+                console.info(`
+    Calcul pour : ${match.teams.home.name} vs ${match.teams.away.name}`);
                 const homeTeamId = match.teams.home.id;
                 const awayTeamId = match.teams.away.id;
 
@@ -104,112 +106,108 @@ export async function runPrediction(options?: { leagueId?: string, matchdayNumbe
                     apiFootballService.getOddsForFixture(match.fixture.id)
                 ]);
 
-                if (!homeStats || !awayStats) {
-                    console.warn(`      -> Stats de base manquantes, match ignoré.`);
-                    continue;
-                }
-                
-                let homeAvgFor = parseFloat(homeStats.goals?.for.average.total as string) || 0;
-                let homeAvgAgainst = parseFloat(homeStats.goals?.against.average.total as string) || 0;
-                let awayAvgFor = parseFloat(awayStats.goals?.for.average.total as string) || 0;
-                let awayAvgAgainst = parseFloat(awayStats.goals?.against.average.total as string) || 0;
+                if (homeStats && awayStats && homeStats.goals && awayStats.goals) {
+                    let homeAvgFor = parseFloat(homeStats.goals.for.average.total as string) || 0;
+                    let homeAvgAgainst = parseFloat(homeStats.goals.against.average.total as string) || 0;
+                    let awayAvgFor = parseFloat(awayStats.goals.for.average.total as string) || 0;
+                    let awayAvgAgainst = parseFloat(awayStats.goals.against.average.total as string) || 0;
 
-                const matchesPlayed = homeStats.fixtures.played.total;
-                
-                if (matchesPlayed < 6) {
-                    console.info(`      -> Début de saison détecté (${matchesPlayed} matchs). Application des corrections.`);
-                    const [prevHomeStats, prevAwayStats]: [TeamStats | null, TeamStats | null] = await Promise.all([
-                        apiFootballService.getTeamStats(homeTeamId, league.id, season - 1),
-                        apiFootballService.getTeamStats(awayTeamId, league.id, season - 1)
-                    ]);
-
-                    let stabilityBoost = 1;
-                    if (prevHomeStats?.goals && prevAwayStats?.goals) {
-                        const prevHomeAvgFor = parseFloat(prevHomeStats.goals.for.average.total as string) || homeAvgFor;
-                        const prevAwayAvgFor = parseFloat(prevAwayStats.goals.for.average.total as string) || awayAvgFor;
-                        const homeStability = Math.abs(prevHomeAvgFor - homeAvgFor) < 0.5 ? 1.1 : 1;
-                        const awayStability = Math.abs(prevAwayAvgFor - awayAvgFor) < 0.5 ? 1.1 : 1;
-                        stabilityBoost = (homeStability + awayStability) / 2;
-
-                        homeAvgFor = (0.8 * prevHomeAvgFor) + (0.2 * homeAvgFor);
-                        homeAvgAgainst = (0.8 * (parseFloat(prevHomeStats.goals.against.average.total as string) || homeAvgAgainst)) + (0.2 * homeAvgAgainst);
-                        awayAvgFor = (0.8 * prevAwayAvgFor) + (0.2 * awayAvgFor);
-                        awayAvgAgainst = (0.8 * (parseFloat(prevAwayStats.goals.against.average.total as string) || awayAvgAgainst)) + (0.2 * awayAvgAgainst);
-                    }
+                    const matchesPlayed = homeStats.fixtures.played.total;
                     
-                    homeAvgFor = bayesianSmooth(homeAvgFor, matchesPlayed) * stabilityBoost;
-                    homeAvgAgainst = bayesianSmooth(homeAvgAgainst, matchesPlayed) * stabilityBoost;
-                    awayAvgFor = bayesianSmooth(awayAvgFor, matchesPlayed) * stabilityBoost;
-                    awayAvgAgainst = bayesianSmooth(awayAvgAgainst, matchesPlayed) * stabilityBoost;
-                }
+                    if (matchesPlayed < 6) {
+                        console.info(`      -> Début de saison détecté (${matchesPlayed} matchs). Application des corrections.`);
+                        const [prevHomeStats, prevAwayStats]: [TeamStats | null, TeamStats | null] = await Promise.all([
+                            apiFootballService.getTeamStats(homeTeamId, league.id, season - 1),
+                            apiFootballService.getTeamStats(awayTeamId, league.id, season - 1)
+                        ]);
 
-                const projectedHomeGoals = (homeAvgFor + awayAvgAgainst) / 2;
-                const projectedAwayGoals = (awayAvgFor + homeAvgAgainst) / 2;
-                
-                const lambdaBoost = matchesPlayed >= 6 ? 1.1 : 1;
-                const lambdas = {
-                    home: projectedHomeGoals * lambdaBoost,
-                    away: projectedAwayGoals * lambdaBoost,
-                    ht: ((projectedHomeGoals + projectedAwayGoals) * 0.45) * lambdaBoost,
-                    st: ((projectedHomeGoals + projectedAwayGoals) * 0.55) * lambdaBoost,
-                    home_ht: (projectedHomeGoals * 0.45) * lambdaBoost,
-                    home_st: (projectedHomeGoals * 0.55) * lambdaBoost,
-                    away_ht: (projectedAwayGoals * 0.45) * lambdaBoost,
-                    away_st: (projectedAwayGoals * 0.55) * lambdaBoost
-                };
+                        let stabilityBoost = 1;
+                        if (prevHomeStats?.goals && prevAwayStats?.goals) {
+                            const prevHomeAvgFor = parseFloat(prevHomeStats.goals.for.average.total as string) || homeAvgFor;
+                            const prevAwayAvgFor = parseFloat(prevAwayStats.goals.for.average.total as string) || awayAvgFor;
+                            const homeStability = Math.abs(prevHomeAvgFor - homeAvgFor) < 0.5 ? 1.1 : 1;
+                            const awayStability = Math.abs(prevAwayAvgFor - awayAvgFor) < 0.5 ? 1.1 : 1;
+                            stabilityBoost = (homeStability + awayStability) / 2;
 
-                const predictionResult = analyseMatchService.predict(lambdas, homeStats, awayStats, projectedHomeGoals, projectedAwayGoals);
-                let confidenceScores: { [key: string]: number } = predictionResult.markets;
-
-                for (const market in confidenceScores) {
-                    if (LOW_OCCURRENCE_MARKETS.includes(market)) {
-                        delete confidenceScores[market];
+                            homeAvgFor = (0.8 * prevHomeAvgFor) + (0.2 * homeAvgFor);
+                            homeAvgAgainst = (0.8 * (parseFloat(prevHomeStats.goals.against.average.total as string) || homeAvgAgainst)) + (0.2 * homeAvgAgainst);
+                            awayAvgFor = (0.8 * prevAwayAvgFor) + (0.2 * awayAvgFor);
+                            awayAvgAgainst = (0.8 * (parseFloat(prevAwayStats.goals.against.average.total as string) || awayAvgAgainst)) + (0.2 * awayAvgAgainst);
+                        }
+                        
+                        homeAvgFor = bayesianSmooth(homeAvgFor, matchesPlayed) * stabilityBoost;
+                        homeAvgAgainst = bayesianSmooth(homeAvgAgainst, matchesPlayed) * stabilityBoost;
+                        awayAvgFor = bayesianSmooth(awayAvgFor, matchesPlayed) * stabilityBoost;
+                        awayAvgAgainst = bayesianSmooth(awayAvgAgainst, matchesPlayed) * stabilityBoost;
                     }
-                }
 
-                const maxConfidence = Math.max(...Object.values(confidenceScores));
-                if (maxConfidence < 60) {
-                    console.warn(`      -> Match exclu : aucune prédiction avec confiance \u2265 60%.`);
-                    continue;
-                }
-                
-                const parsedOdds = parseOdds(oddsData || []);
-                
-                let savedCount = 0;
-                for (const market in confidenceScores) {
-                    const score = confidenceScores[market];
-                    if (typeof score === 'undefined' || score < 60) continue;
-
-                    const odd = parsedOdds[market];
-                    const status = odd ? 'ELIGIBLE' : 'INCOMPLETE';
-
-                    const predictionData = {
-                        fixtureId: match.fixture.id,
-                        matchLabel: `${match.teams.home.name} vs ${match.teams.away.name}`,
-                        matchDate: new Date(match.fixture.date).toISOString(),
-                        leagueId: league.id,
-                        market: market,
-                        score: score,
-                        odd: odd || null,
-                        status: status,
-                        createdAt: new Date().toISOString()
+                    const projectedHomeGoals = (homeAvgFor + awayAvgAgainst) / 2;
+                    const projectedAwayGoals = (awayAvgFor + homeAvgAgainst) / 2;
+                    
+                    const lambdaBoost = matchesPlayed >= 6 ? 1.1 : 1;
+                    const lambdas = {
+                        home: projectedHomeGoals * lambdaBoost,
+                        away: projectedAwayGoals * lambdaBoost,
+                        ht: ((projectedHomeGoals + projectedAwayGoals) * 0.45) * lambdaBoost,
+                        st: ((projectedHomeGoals + projectedAwayGoals) * 0.55) * lambdaBoost,
+                        home_ht: (projectedHomeGoals * 0.45) * lambdaBoost,
+                        home_st: (projectedHomeGoals * 0.55) * lambdaBoost,
+                        away_ht: (projectedAwayGoals * 0.45) * lambdaBoost,
+                        away_st: (projectedAwayGoals * 0.55) * lambdaBoost
                     };
 
-                    if (firestoreService && firestoreService.savePrediction) {
-                        await firestoreService.savePrediction(predictionData);
-                        savedCount++;
-                    } else {
-                        console.error('      [ERREUR] firestoreService.savePrediction non disponible!');
-                    }
-                }
-                
-                if (savedCount > 0) {
-                    console.info(`      -> ${savedCount} prédictions sauvegardées dans Firestore.`);
-                }
+                    const predictionResult = analyseMatchService.predict(lambdas, homeStats, awayStats, projectedHomeGoals, projectedAwayGoals);
+                    let confidenceScores: { [key: string]: number } = predictionResult.markets;
 
-                await sleep(500);
+                    for (const market in confidenceScores) {
+                        if (LOW_OCCURRENCE_MARKETS.includes(market)) {
+                            delete confidenceScores[market];
+                        }
+                    }
+
+                    const maxConfidence = Math.max(...Object.values(confidenceScores));
+                    if (maxConfidence < 60) {
+                        console.warn(`      -> Match exclu : aucune prédiction avec confiance ≥ 60%.`);
+                        continue;
+                    }
+                    
+                    const parsedOdds = parseOdds(oddsData || []);
+                    
+                    let savedCount = 0;
+                    for (const market in confidenceScores) {
+                        const score = confidenceScores[market];
+                        if (typeof score === 'undefined' || score < 60) continue;
+
+                        const odd = parsedOdds[market];
+                        const status = odd ? 'ELIGIBLE' : 'INCOMPLETE';
+
+                        const predictionData = {
+                            fixtureId: match.fixture.id,
+                            matchLabel: `${match.teams.home.name} vs ${match.teams.away.name}`,
+                            matchDate: new Date(match.fixture.date).toISOString(),
+                            leagueId: league.id,
+                            market: market,
+                            score: score,
+                            odd: odd || null,
+                            status: status,
+                            createdAt: new Date().toISOString()
+                        };
+
+                        if (firestoreService && firestoreService.savePrediction) {
+                            await firestoreService.savePrediction(predictionData);
+                            savedCount++;
+                        } else {
+                            console.error('      [ERREUR] firestoreService.savePrediction non disponible!');
+                        }
+                    }
+                    
+                    if (savedCount > 0) {
+                        console.info(`      -> ${savedCount} prédictions sauvegardées dans Firestore.`);
+                    }
+
+                    await sleep(500);
+                }
             }
-        }
     }
     
     console.info("\n--- Job de Prédiction Terminé ---");
@@ -219,6 +217,5 @@ export async function runPrediction(options?: { leagueId?: string, matchdayNumbe
     }
 }
 
-module.exports = { runPrediction };
-
 runPrediction({});
+}

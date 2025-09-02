@@ -1,15 +1,16 @@
 
 
-const chalk = require('chalk');
-const { firestoreService } = require('../services/Firestore.service');
-const { runPrediction } = require('./prediction.job');
+import chalk from 'chalk';
+import { firestoreService } from '../services/Firestore.service';
+import { runPrediction } from './prediction.job';
 
 async function runLeagueOrchestrator() {
   console.log(chalk.blue.bold("--- Démarrage du Job d'Orchestration des Ligues ---"));
   const leagues = await firestoreService.getAllLeaguesStatus();
 
   for (const league of leagues) {
-    console.log(chalk.cyan(`\n[Orchestrateur] Vérification de la ligue : ${league.leagueName} (ID: ${league.id})`));
+    console.log(chalk.cyan(`
+[Orchestrateur] Vérification de la ligue : ${league.leagueName} (ID: ${league.id})`));
     
     if (league.currentMatchdayStatus === 'COMPLETED') {
       console.log(chalk.green(`  -> Journée ${league.currentMatchdayNumber} COMPLETED. Déclenchement du prediction-job pour la prochaine journée.`));
@@ -33,5 +34,3 @@ async function runLeagueOrchestrator() {
 }
 
 runLeagueOrchestrator();
-
-module.exports = { runLeagueOrchestrator };

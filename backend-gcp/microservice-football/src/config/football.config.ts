@@ -1,8 +1,3 @@
-// backend-gcp/microservice-football/src/config/football.config.ts
-
-// Utilisation de require pour process, compatible avec CommonJS
-const process = require("process");
-
 const API_KEY = process.env.API_KEY || '7f7700a471beeeb52aecde406a3870ba';
 const API_HOST = 'v3.football.api-sports.io';
 const MAX_API_ATTEMPTS = 5;
@@ -38,7 +33,7 @@ const LEAGUES_TO_ANALYZE = [
 
 const LOW_OCCURRENCE_MARKETS = ['away_ht_over_3.5', 'home_ht_over_3.5', 'away_st_over_3.5', 'home_st_over_3.5'];
 
-module.exports = {
+export {
     API_KEY,
     API_HOST,
     MAX_API_ATTEMPTS,
