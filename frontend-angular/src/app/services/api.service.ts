@@ -9,7 +9,7 @@ import { PredictionsApiResponse, TicketsApiResponse } from '../types/api-types';
 export class ApiService {
 
   // 2. Définissez l'URL de base de votre API déployée
-  private baseUrl = 'https://oracle-prediction-football-321557095918.europe-west1.run.app/api';
+  private baseUrl = 'https://oracle-prediction-gateway-43pysj5a.ew.gateway.dev/api';
 
   // 3. Injectez HttpClient dans le constructeur
   constructor(private http: HttpClient) { }
