@@ -9,15 +9,13 @@ produces:
   - 'application/json'
 
 x-google-backend:
-  address: https://oracle-prediction-football-321557095918.europe-west1.run.app 
+  address: https://oracle-prediction-football-321557095918.europe-west1.run.app
 
 paths:
-  # La syntaxe corrigée pour capturer tous les sous-chemins
   /api/{path=**}:
     get:
       summary: 'Proxy all GET requests to the backend'
       operationId: 'proxy-get'
-      # Cette section est nécessaire pour déclarer la variable utilisée dans le chemin
       parameters:
         - in: path
           name: path
@@ -28,6 +26,27 @@ paths:
       responses:
         '200':
           description: 'A successful response'
+    # AJOUT DE CETTE SECTION POUR LE CORS
+    options:
+      summary: 'CORS support'
+      operationId: 'cors-handler'
+      parameters:
+        - name: path
+          in: path
+          type: string
+          required: true
+      responses:
+        '204':
+          description: 'No Content response for CORS preflight.'
+          headers:
+            Access-Control-Allow-Origin:
+              type: 'string'
+            Access-Control-Allow-Methods:
+              type: 'string'
+            Access-Control-Allow-Headers:
+              type: 'string'
+            Access-Control-Max-Age:
+              type: 'string'
 
 securityDefinitions:
   firebase:
