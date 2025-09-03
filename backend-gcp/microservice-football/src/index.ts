@@ -2,7 +2,6 @@ import express, { type Request, type Response } from 'express';
 import chalk from 'chalk';
 import cors from 'cors';
 import { firestoreService } from './services/Firestore.service';
-
 import { runBacktest } from './jobs/backtest.job';
 import { runPrediction } from './jobs/prediction.job';
 import { runTicketGenerator } from './jobs/ticket-generator.job';
@@ -10,10 +9,9 @@ import { runTicketGenerator } from './jobs/ticket-generator.job';
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// --- CONFIGURATION CORS SPÉCIFIQUE ---
 const allowedOrigins = [
     process.env.CORS_ORIGIN || 'http://localhost:4200',
-    'https://4200-firebase-oracle-prediction-1756797510260.cluster-64pjnskmlbaxowh5lzq6i7v4ra.cloudworkstations.dev' // <--- AJOUTEZ CETTE LIGNE
+    'https://4200-firebase-oracle-prediction-1756797510260.cluster-64pjnskmlbaxowh5lzq6i7v4ra.cloudworkstations.dev'
 ];
 const corsOptions: cors.CorsOptions = {
     origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
@@ -28,32 +26,32 @@ const corsOptions: cors.CorsOptions = {
 };
 app.use(cors(corsOptions));
 
-// --- MIDDLEWARE D'AUTHENTIFICATION (PLACEHOLDER) ---
-const authenticate = (req: Request, res: Response, next: () => void) => {
-    const token = req.headers.authorization;
-    if (!token) {
-        return res.status(401).json({ message: "Accès non autorisé. Jeton manquant." });
-    }
-    console.log(chalk.yellow("Authentification (placeholder) : Jeton reçu. Passage autorisé."));
-    next();
-};
-
-// --- ROUTE POUR TOUT ENCHAÎNER (SÉCURISÉE) ---
-app.get('/run-all-jobs', authenticate, (req: Request, res: Response) => {
+app.get('/run-all-jobs', (req: Request, res: Response) => {
     res.status(202).json({ message: "La chaîne de jobs complète a été démarrée." });
     const runFullSequence = async () => {
         try {
+            console.log(chalk.green.bold("--- SÉQUENCE COMPLÈTE DÉMARRÉE ---"));
+
+            console.log(chalk.yellow("Étape 1/3 : Démarrage du Backtest..."));
             await runBacktest();
+            console.log(chalk.green("Étape 1/3 : Backtest terminé."));
+
+            console.log(chalk.yellow("Étape 2/3 : Démarrage de la génération des prédictions..."));
             await runPrediction({});
+            console.log(chalk.green("Étape 2/3 : Génération des prédictions terminée."));
+
+            console.log(chalk.yellow("Étape 3/3 : Démarrage de la génération des tickets..."));
             await runTicketGenerator({});
+            console.log(chalk.green("Étape 3/3 : Génération des tickets terminée."));
+
+            console.log(chalk.green.bold("--- SÉQUENCE COMPLÈTE TERMINÉE AVEC SUCCÈS ---"));
         } catch (error) {
-            console.error(chalk.red.bold("ERREUR CRITIQUE DANS LA SÉQUENCE DE JOBS :"), error);
+            console.error(chalk.red.bold("--- ERREUR CRITIQUE PENDANT LA SÉQUENCE DE JOBS ---"), error);
         }
     };
     runFullSequence();
 });
 
-// --- ROUTES API DYNAMIQUES POUR LE FRONTEND ---
 app.get('/api/tickets', async (req: Request, res: Response) => {
     try {
         const date = typeof req.query.date === 'string' ? req.query.date : new Date().toISOString().split('T')[0];

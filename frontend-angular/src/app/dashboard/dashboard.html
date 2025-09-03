@@ -1,68 +1,45 @@
-
-<header class="p-4 border-b border-[#222] flex justify-between items-center">
-    <a routerLink="/" class="text-2xl font-bold text-[#00FF41]">The Oracle</a>
-    <div class="flex items-center gap-4">
-        <a [routerLink]="(authService.user$ | async) ? '/profile' : '/login'" 
-           routerLinkActive="bg-[#222]" 
-           [routerLinkActiveOptions]="{ exact: true }" 
-           class="p-2 rounded-full hover:bg-[#111] transition-colors">
-            <!-- User Icon Placeholder -->
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-        </a>
-        <button (click)="togglePremium()" 
-                [ngClass]="isPremium ? 'bg-[#333] text-[#E0E0E0]' : 'bg-[#00FF41] text-black'"
-                class="px-4 py-2 rounded">
-          {{ isPremium ? 'Switch to Free View' : 'Activate Premium' }}
-        </button>
-        <button *ngIf="(authService.user$ | async)" (click)="authService.logout()"
-                class="px-4 py-2 bg-[#333] text-[#E0E0E0] rounded hover:bg-[#444] transition-colors">
-          Déconnexion
-        </button>
-    </div>
-</header>
-
-<main class="container mx-auto p-4">
+<div class="container mx-auto p-4">
   <app-day-selector 
-    [selectedDayOffset]="selectedDayOffset" 
-    [isPremium]="isPremium"
+    [selectedDayOffset]="selectedDayOffset"
     (selectDay)="handleDaySelect($event)">
   </app-day-selector>
-
-  <!-- Loading and Error States -->
-  <div *ngIf="isLoading" class="flex justify-center items-center h-64">
-    <div class="text-center text-lg">Loading data...</div>
+  
+  <div *ngIf="isLoading" class="text-center mt-8">
+    <p class="text-lg">Chargement des données...</p>
   </div>
 
-  <div *ngIf="error" class="text-center text-red-500 my-8 p-4 border border-red-500 rounded-lg">
-    <p class="font-bold">Error loading data:</p>
-    <p>{{ error }}</p>
+  <div *ngIf="!isLoading && error" class="text-center mt-8 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+    <strong class="font-bold">Une erreur est survenue :</strong>
+    <span class="block sm:inline">{{ error }}</span>
   </div>
 
-  <!-- Data Display Container -->
   <div *ngIf="!isLoading && !error">
-    <app-architects-simulator
-      [ticketsData]="ticketsData"
-      [selectedDayOffset]="selectedDayOffset">
-    </app-architects-simulator>
-
-    <!-- Section for Tickets -->
     <div class="mb-12">
-      <h2 class="text-3xl font-bold mb-6 text-center">Tickets du Jour</h2>
-      <app-tickets-list 
-        [ticketsData]="ticketsData" 
-        [selectedDayOffset]="selectedDayOffset">
-      </app-tickets-list>
+      <h2 class="text-3xl font-bold text-gray-800 my-6">Tickets du Jour</h2>
+      <div *ngIf="objectKeys(ticketsData).length > 0; else noTickets">
+        <app-tickets-list [ticketsData]="ticketsData"></app-tickets-list>
+      </div>
+      <ng-template #noTickets>
+        <div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4" role="alert">
+          <p>Aucun ticket n'a été généré pour cette date.</p>
+        </div>
+      </ng-template>
     </div>
 
-    <!-- Section for Prediction List -->
     <div class="mb-12">
-      <app-predictions-list 
-        [allPredictions]="predictionsData" 
-        [dayOffset]="selectedDayOffset"
-        [isPremium]="isPremium">
-      </app-predictions-list>
+      <h2 class="text-3xl font-bold text-gray-800 my-6">Prédictions du Jour</h2>
+      <div *ngIf="objectKeys(predictionsData).length > 0; else noPredictions">
+        <app-predictions-list [allPredictions]="predictionsData"></app-predictions-list>
+      </div>
+      <ng-template #noPredictions>
+        <div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 mt-4" role="alert">
+          <p>Aucune prédiction disponible pour cette date. C'est peut-être la trêve !</p>
+        </div>
+      </ng-template>
     </div>
+    
+    <app-architects-simulator [ticketsData]="ticketsData" [selectedDayOffset]="selectedDayOffset"></app-architects-simulator>
   </div>
-</main>
+</div>
 
 <app-paywall *ngIf="showPaywall" (close)="closePaywall()" (activatePremium)="handleActivatePremium()"></app-paywall>

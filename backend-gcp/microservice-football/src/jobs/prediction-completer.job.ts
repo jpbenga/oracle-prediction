@@ -1,5 +1,3 @@
-
-
 import chalk from 'chalk';
 import { firestoreService } from '../services/Firestore.service';
 import { apiFootballService } from '../services/ApiFootball.service';
@@ -47,20 +45,21 @@ function parseOdds(oddsData: any[]) {
     return parsed;
 }
 
-async function runPredictionCompleter() {
+export async function runPredictionCompleter() {
     console.log(chalk.blue.bold("--- Démarrage du Job de Complétion des Prédictions ---"));
     const incompletePredictions = await firestoreService.getIncompletePredictions();
 
     if (incompletePredictions.length === 0) {
         console.log(chalk.yellow("Aucune prédiction incomplète trouvée. Fin du job."));
+        console.log(chalk.blue.bold("--- Job de Complétion des Prédictions Terminé ---"));
         return;
     }
-
+    
+    console.log(chalk.cyan(`${incompletePredictions.length} prédictions incomplètes à traiter.`));
     const updatedDates: { [date: string]: boolean } = {};
 
     for (const prediction of incompletePredictions) {
-        console.log(chalk.cyan(`
-[Complétion] Traitement de la prédiction : ${prediction.matchLabel} (ID: ${prediction.id})`));
+        console.log(chalk.cyan(`\n[Complétion] Traitement de : ${prediction.matchLabel} (ID: ${prediction.id})`));
         
         const oddsData = await apiFootballService.getOddsForFixture(prediction.fixtureId);
         if (oddsData && oddsData.length > 0) {
@@ -88,10 +87,10 @@ async function runPredictionCompleter() {
                             updatedDates[matchDateStr] = true;
                         }
                     } else {
-                        console.log(chalk.red(`    -> Date invalide trouvée pour la prédiction ${prediction.id}: ${prediction.matchDate}`));
+                        console.log(chalk.red(`   -> Date invalide trouvée pour la prédiction ${prediction.id}: ${prediction.matchDate}`));
                     }
                 } else {
-                     console.log(chalk.red(`    -> Date manquante pour la prédiction ${prediction.id}.`));
+                     console.log(chalk.red(`   -> Date manquante pour la prédiction ${prediction.id}.`));
                 }
 
             } else {
@@ -104,15 +103,13 @@ async function runPredictionCompleter() {
 
     const datesToGenerate = Object.keys(updatedDates);
     if (datesToGenerate.length > 0) {
-        console.log(chalk.magenta.bold(`
--> Des prédictions ont été complétées. Déclenchement du ticket-generator pour les dates: ${datesToGenerate.join(', ')}`));
+        console.log(chalk.magenta.bold(`\n-> Des prédictions ont été complétées. Déclenchement du ticket-generator pour les dates: ${datesToGenerate.join(', ')}`));
         for (const date of datesToGenerate) {
             await runTicketGenerator({ date });
         }
+    } else {
+        console.log(chalk.yellow("\nAucune prédiction n'a été mise à jour avec une cote. Pas de déclenchement du ticket-generator."));
     }
 
     console.log(chalk.blue.bold("--- Job de Complétion des Prédictions Terminé ---"));
 }
-
-// Lancer le job
-runPredictionCompleter();

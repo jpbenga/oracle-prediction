@@ -1,4 +1,3 @@
-
 import chalk from 'chalk';
 import admin from 'firebase-admin';
 import { firestoreService } from '../services/Firestore.service';
@@ -38,7 +37,6 @@ function getConfidenceSliceKey(score: number): string {
     if (score >= 80) return "80-85";
     if (score >= 75) return "75-80";
     if (score >= 70) return "70-75";
-    // This range should be confirmed based on backtest data structure
     return "0-69"; 
 }
 
@@ -47,9 +45,6 @@ function isPredictionEligible(prediction: Bet): boolean {
         return false;
     }
 
-    // The market in the prediction might be generic, e.g., 'match_winner'. 
-    // The confidence_details might have more specific keys, e.g., 'match_winner_home', 'match_winner_away'.
-    // We need to find the correct key in confidence_details that corresponds to the prediction's market.
     const marketKey = Object.keys(prediction.confidence_details).find(key => key.startsWith(prediction.market));
 
     if (!marketKey) {
@@ -99,25 +94,21 @@ export async function runTicketGenerator(options: { date?: string } = {}) {
     console.log(chalk.yellow(`Suppression des tickets PENDING existants pour le ${targetDate}...`));
     await firestoreService.deleteTicketsForDate(targetDate);
 
-    console.log(chalk.yellow(`Récupération des pronostics pour le ${targetDate} depuis Firestore...`));
-    const predictions: Bet[] = await firestoreService.getPredictionsForDate(targetDate);
+    console.log(chalk.yellow(`Récupération des pronostics éligibles pour le ${targetDate} depuis Firestore...`));
+    const eligiblePredictions: Bet[] = await firestoreService.getEligiblePredictions(targetDate);
 
-    if (predictions.length === 0) {
-        console.log(chalk.green("Aucun pronostic trouvé pour cette date. Arrêt du job."));
+    if (eligiblePredictions.length === 0) {
+        console.log(chalk.yellow('Aucune prédiction éligible trouvée pour aujourd\'hui. Aucun ticket ne sera généré.'));
+        console.log(chalk.blue.bold("--- Job de Génération de Tickets Terminé ---"));
         return;
     }
-    console.log(chalk.cyan(`${predictions.length} pronostics trouvés.`));
+    
+    console.log(chalk.cyan(`${eligiblePredictions.length} pronostics éligibles trouvés.`));
 
-    const eligibleBets: Bet[] = predictions.filter(isPredictionEligible).map(pred => ({
+    const eligibleBets: Bet[] = eligiblePredictions.map(pred => ({
         ...pred,
         expectedValue: (pred.score / 100) * pred.odd
     }));
-
-    if (eligibleBets.length === 0) {
-        console.log(chalk.green("Aucun pronostic ÉLIGIBLE trouvé pour cette date avec la nouvelle stratégie. Arrêt du job."));
-        return;
-    }
-    console.log(chalk.cyan(`${eligibleBets.length} pronostics éligibles trouvés.`));
 
     const allPossibleTickets: Ticket[] = [];
 
@@ -139,6 +130,7 @@ export async function runTicketGenerator(options: { date?: string } = {}) {
 
     if (allPossibleTickets.length === 0) {
         console.log(chalk.yellow("Aucun ticket n'a pu être généré avec les critères actuels."));
+        console.log(chalk.blue.bold("--- Job de Génération de Tickets Terminé ---"));
         return;
     }
 
