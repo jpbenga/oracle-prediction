@@ -1,104 +1,55 @@
-import axios from 'axios';
+import axios, { AxiosInstance } from 'axios';
 import chalk from 'chalk';
-import { API_HOST, API_KEY, MAX_API_ATTEMPTS } from '../config/football.config';
-import util from 'util';
-
-interface AxiosInstance {
-    get(url: string, config?: any): Promise<any>;
-}
-
-const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+import { Match } from '../types/football.types';
+import { footballConfig } from '../config/football.config';
 
 class ApiFootballService {
-    private api: AxiosInstance;
+  private api: AxiosInstance;
 
-    constructor() {
-        this.api = axios.create({
-            baseURL: `https://${API_HOST}`,
-            headers: { 'x-apisports-key': API_KEY },
-            timeout: 20000
-        });
+  constructor() {
+    this.api = axios.create({
+      baseURL: 'https://v3.football.api-sports.io',
+      headers: {
+        'x-rapidapi-host': footballConfig.apiHost,
+        'x-rapidapi-key': footballConfig.apiKey,
+      },
+    });
+  }
+
+  private async makeRequest<T>(endpoint: string, params: Record<string, any>): Promise<T | null> {
+    try {
+      const response = await this.api.get(endpoint, { params });
+      return response.data.response;
+    } catch (error) {
+      console.error(chalk.red(`Erreur API (${endpoint}):`), error);
+      return null;
     }
+  }
 
-    private async requestWithRetry<T>(apiCall: () => Promise<any>, callName: string, expectArray: boolean = true): Promise<T | null> {
-        let attempts = 0;
-        while (attempts < MAX_API_ATTEMPTS) {
-            attempts++;
-            try {
-                console.log(chalk.gray(`       -> Appel API (tentative ${attempts}): ${callName}`));
-                const response = await apiCall();
-                const apiResponseData = response.data.response;
+  async getTeamStats(teamId: number, leagueId: number, season: number): Promise<any> {
+    return this.makeRequest<any>('/teams/statistics', { team: teamId, league: leagueId, season });
+  }
 
-                if (expectArray && Array.isArray(apiResponseData)) {
-                     if (apiResponseData.length > 0) {
-                        console.log(chalk.green(`       -> Succès API pour ${callName} (tableau avec données)`));
-                        return apiResponseData as T;
-                     } else {
-                        console.log(chalk.cyan(`       -> Réponse API vide pour ${callName}, considéré comme un succès (tableau vide).`));
-                        return apiResponseData as T;
-                     }
-                }
+  async getOddsForFixture(fixtureId: number): Promise<any> {
+    return this.makeRequest<any>('/odds', { fixture: fixtureId });
+  }
 
-                if (!expectArray && typeof apiResponseData === 'object' && apiResponseData !== null && !Array.isArray(apiResponseData)) {
-                    console.log(chalk.green(`       -> Succès API pour ${callName} (objet)`));
-                    return apiResponseData as T;
-                }
-                
-                console.log(chalk.yellow(`       -> Réponse inattendue pour ${callName}, tentative ${attempts}/${MAX_API_ATTEMPTS}.`));
-                
-                console.log(chalk.yellow(`          Contenu de la réponse inattendue:`));
-                console.log(util.inspect(response.data, { 
-                    depth: null,        // Affiche tous les niveaux d'imbrication
-                    colors: true,       // Couleurs pour une meilleure lisibilité
-                    maxArrayLength: null, // Affiche tous les éléments des tableaux
-                    maxStringLength: null, // Affiche les chaînes complètes
-                    breakLength: 80     // Largeur d'affichage
-                }));
+  async getRounds(leagueId: number, season: number): Promise<string[] | null> {
+    return this.makeRequest<string[]>('/fixtures/rounds', { league: leagueId, season, current: 'false' });
+  }
+    
+  async getFixturesByRound(leagueId: number, season: number, round: string): Promise<Match[] | null> {
+    return this.makeRequest<Match[]>('/fixtures', { league: leagueId, season, round });
+  }
 
-            } catch (error: any) {
-                console.log(chalk.yellow(`       -> Erreur API (tentative ${attempts}/${MAX_API_ATTEMPTS}) pour ${callName}: ${error.message}`));
-            }
-            if (attempts < MAX_API_ATTEMPTS) await sleep(1500);
-        }
-        console.log(chalk.red(`       -> ERREUR FINALE: Échec de l'appel pour ${callName} après ${MAX_API_ATTEMPTS} tentatives.`));
-        return null;
-    }
+  async getMatchesByDateRange(fromDate: string, toDate: string): Promise<Match[] | null> {
+    return this.makeRequest<Match[]>('/fixtures', { from: fromDate, to: toDate });
+  }
 
-    public async getRounds(leagueId: number, season: number): Promise<string[] | null> {
-        return this.requestWithRetry<string[]>(
-            () => this.api.get('/fixtures/rounds', { params: { league: leagueId, season, current: 'true' } }),
-            `Rounds pour league ${leagueId}, saison ${season}`
-        );
-    }
-
-    public async getFixturesByRound(leagueId: number, season: number, roundName: string): Promise<any[] | null> {
-        return this.requestWithRetry<any[]>(
-            () => this.api.get('/fixtures', { params: { league: leagueId, season, round: roundName } }),
-            `Fixtures pour league ${leagueId}, round ${roundName}`
-        );
-    }
-
-    public async getTeamStats(teamId: number, leagueId: number, season: number): Promise<any | null> {
-        return this.requestWithRetry<any>(
-            () => this.api.get('/teams/statistics', { params: { team: teamId, league: leagueId, season } }),
-            `Stats pour équipe ${teamId}`,
-            false
-        );
-    }
-
-    public async getOddsForFixture(fixtureId: number): Promise<any[] | null> {
-        return this.requestWithRetry<any[]>(
-            () => this.api.get('/odds', { params: { fixture: fixtureId } }),
-            `Cotes pour match ${fixtureId}`
-        );
-    }
-
-    public async getFixtureResult(fixtureId: number): Promise<any | null> {
-        return this.requestWithRetry<any>(
-            () => this.api.get('/fixtures', { params: { id: fixtureId } }),
-            `Résultat pour match ${fixtureId}`
-        );
-    }
+  async getMatchById(matchId: number): Promise<Match | null> {
+    const results = await this.makeRequest<Match[]>('/fixtures', { id: matchId });
+    return results && results.length > 0 ? results[0] : null;
+  }
 }
 
 export const apiFootballService = new ApiFootballService();

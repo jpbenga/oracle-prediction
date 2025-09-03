@@ -1,14 +1,20 @@
-import express, { type Request, type Response } from 'express';
+// backend-gcp/microservice-football/src/index.ts
+
+import express from 'express';
 import chalk from 'chalk';
-import cors from 'cors';
-import { firestoreService } from './services/Firestore.service';
-import { runBacktest } from './jobs/backtest.job';
-import { runPrediction } from './jobs/prediction.job';
+import cors from 'cors'; // Ajout de l'import pour CORS
+import { runLeagueOrchestrator } from './jobs/league-orchestrator.job';
+import { runPredictionCompleter } from './jobs/prediction-completer.job';
 import { runTicketGenerator } from './jobs/ticket-generator.job';
+import { runResultsUpdater } from './jobs/results-updater.job';
+import { runBacktestOrchestrator } from './jobs/backtest-orchestrator.job';
+import { BacktestWorkerMessage, runBacktestWorker } from './jobs/backtest-worker.job';
+import { firestoreService } from './services/Firestore.service'; // Ajout pour les routes API
 
 const app = express();
-const PORT = process.env.PORT || 8080;
+app.use(express.json());
 
+// --- Configuration CORS ---
 const allowedOrigins = [
     process.env.CORS_ORIGIN || 'http://localhost:4200',
     'https://4200-firebase-oracle-prediction-1756797510260.cluster-64pjnskmlbaxowh5lzq6i7v4ra.cloudworkstations.dev'
@@ -21,80 +27,92 @@ const corsOptions: cors.CorsOptions = {
             callback(new Error('Not allowed by CORS'), false);
         }
     },
-    credentials: true,
-    optionsSuccessStatus: 200
 };
 app.use(cors(corsOptions));
 
-app.get('/run-all-jobs', (req: Request, res: Response) => {
-    res.status(202).json({ message: "La chaîne de jobs complète a été démarrée." });
-    const runFullSequence = async () => {
-        try {
-            console.log(chalk.green.bold("--- SÉQUENCE COMPLÈTE DÉMARRÉE ---"));
 
-            console.log(chalk.yellow("Étape 1/3 : Démarrage du Backtest..."));
-            await runBacktest();
-            console.log(chalk.green("Étape 1/3 : Backtest terminé."));
+const PORT = process.env.PORT || 8080;
 
-            console.log(chalk.yellow("Étape 2/3 : Démarrage de la génération des prédictions..."));
-            await runPrediction({});
-            console.log(chalk.green("Étape 2/3 : Génération des prédictions terminée."));
+// ====================================================================
+// ENDPOINT POUR DÉCLENCHER L'ORCHESTRATEUR (SERVICE PRINCIPAL)
+// ====================================================================
+app.get('/run-all-jobs', async (req, res) => {
+  console.log(chalk.magenta.bold('--- Déclenchement de la séquence de jobs ---'));
+  try {
+    // On lance l'orchestrateur de backtest. C'est très rapide.
+    await runBacktestOrchestrator();
 
-            console.log(chalk.yellow("Étape 3/3 : Démarrage de la génération des tickets..."));
-            await runTicketGenerator({});
-            console.log(chalk.green("Étape 3/3 : Génération des tickets terminée."));
+    // On peut lancer les autres jobs courts en parallèle
+    await Promise.all([
+      runLeagueOrchestrator(),
+      runPredictionCompleter(),
+      runTicketGenerator(),
+      runResultsUpdater(),
+    ]);
 
-            console.log(chalk.green.bold("--- SÉQUENCE COMPLÈTE TERMINÉE AVEC SUCCÈS ---"));
-        } catch (error) {
-            console.error(chalk.red.bold("--- ERREUR CRITIQUE PENDANT LA SÉQUENCE DE JOBS ---"), error);
-        }
-    };
-    runFullSequence();
+    res.status(202).send('La séquence de jobs a été démarrée avec succès.');
+  } catch (error) {
+    console.error(chalk.red('Erreur lors du déclenchement des jobs :'), error);
+    res.status(500).send('Échec du démarrage des jobs.');
+  }
 });
 
-app.get('/api/tickets', async (req: Request, res: Response) => {
+// ====================================================================
+// ENDPOINT POUR LE WORKER (DÉCLENCHÉ PAR PUB/SUB)
+// ====================================================================
+app.post('/', async (req, res) => {
+  if (!req.body || !req.body.message) {
+    const errorMessage = 'Requête invalide : corps ou message manquant.';
+    console.error(chalk.red(errorMessage));
+    return res.status(400).send(errorMessage);
+  }
+
+  try {
+    const messageData = Buffer.from(req.body.message.data, 'base64').toString('utf-8');
+    const messagePayload = JSON.parse(messageData) as BacktestWorkerMessage;
+
+    await runBacktestWorker(messagePayload);
+    res.status(204).send();
+  } catch (error) {
+    console.error(chalk.red('Erreur dans le worker Pub/Sub :'), error);
+    res.status(500).send('Échec du traitement du message.');
+  }
+});
+
+// ====================================================================
+// ROUTES API POUR LE FRONT-END
+// ====================================================================
+app.get('/api/tickets', async (req, res) => {
     try {
         const date = typeof req.query.date === 'string' ? req.query.date : new Date().toISOString().split('T')[0];
-        if(date) {
-            const tickets = await firestoreService.getTicketsForDate(date);
-            if (tickets.length > 0) {
-                res.status(200).json(tickets);
-            } else {
-                res.status(404).json({ message: "Aucun ticket trouvé pour cette date." });
-            }
+        const tickets = await firestoreService.getTicketsForDate(date); // Assurez-vous que cette méthode existe
+        if (tickets.length > 0) {
+            res.status(200).json(tickets);
+        } else {
+            res.status(404).json({ message: "Aucun ticket trouvé pour cette date." });
         }
     } catch (error) {
-        if (error instanceof Error) {
-            res.status(500).json({ message: "Erreur du serveur lors de la récupération des tickets.", error: error.message });
-        } else {
-            res.status(500).json({ message: "Erreur du serveur lors de la récupération des tickets." });
-        }
+        res.status(500).json({ message: "Erreur du serveur." });
     }
 });
 
-app.get('/api/predictions', async (req: Request, res: Response) => {
+app.get('/api/predictions', async (req, res) => {
     try {
         const date = typeof req.query.date === 'string' ? req.query.date : new Date().toISOString().split('T')[0];
-        if(date) {
-            const predictions = await firestoreService.getPredictionsForDate(date);
-            if (predictions.length > 0) {
-                res.status(200).json(predictions);
-            } else {
-                res.status(404).json({ message: "Aucune prédiction trouvée pour cette date." });
-            }
+        const predictions = await firestoreService.getPredictionsForDate(date); // Assurez-vous que cette méthode existe
+        if (predictions.length > 0) {
+            res.status(200).json(predictions);
+        } else {
+            res.status(404).json({ message: "Aucune prédiction trouvée pour cette date." });
         }
     } catch (error) {
-        if (error instanceof Error) {
-            res.status(500).json({ message: "Erreur du serveur lors de la récupération des prédictions.", error: error.message });
-        } else {
-            res.status(500).json({ message: "Erreur du serveur lors de la récupération des prédictions." });
-        }
+        res.status(500).json({ message: "Erreur du serveur." });
     }
 });
+
 
 app.listen(PORT, () => {
-    console.log(chalk.inverse(`
-🏈 Microservice Football démarré sur le port ${PORT}`));
-    console.log(chalk.cyan(`   API dynamique sur http://localhost:${PORT}/api/tickets`));
-    console.log(chalk.magenta.bold(`   Endpoint sécurisé sur http://localhost:${PORT}/run-all-jobs`));
+  console.log(
+    chalk.green.bold(`🚀 Le microservice est démarré et écoute sur le port ${PORT}`)
+  );
 });

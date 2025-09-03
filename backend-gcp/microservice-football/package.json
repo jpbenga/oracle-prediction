@@ -12,6 +12,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@google-cloud/pubsub": "^5.2.0",
     "axios": "^1.11.0",
     "chalk": "^4.1.2",
     "cors": "^2.8.5",

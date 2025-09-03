@@ -1,8 +1,11 @@
+// backend-gcp/microservice-football/src/jobs/prediction-completer.job.ts
+
 import chalk from 'chalk';
 import { firestoreService } from '../services/Firestore.service';
 import { apiFootballService } from '../services/ApiFootball.service';
 import { runTicketGenerator } from './ticket-generator.job';
 
+// Cette fonction de parsing reste la même, elle est correcte.
 function parseOdds(oddsData: any[]) {
     if (!oddsData || oddsData.length === 0) return {};
     const parsed: { [key: string]: number } = {};
@@ -47,7 +50,9 @@ function parseOdds(oddsData: any[]) {
 
 export async function runPredictionCompleter() {
     console.log(chalk.blue.bold("--- Démarrage du Job de Complétion des Prédictions ---"));
-    const incompletePredictions = await firestoreService.getIncompletePredictions();
+    
+    // CORRECTION : Utilisation de la méthode correcte 'findIncompletePredictions'
+    const incompletePredictions = await firestoreService.findIncompletePredictions();
 
     if (incompletePredictions.length === 0) {
         console.log(chalk.yellow("Aucune prédiction incomplète trouvée. Fin du job."));
@@ -61,19 +66,21 @@ export async function runPredictionCompleter() {
     for (const prediction of incompletePredictions) {
         console.log(chalk.cyan(`\n[Complétion] Traitement de : ${prediction.matchLabel} (ID: ${prediction.id})`));
         
+        // CORRECTION : Utilisation de la méthode 'getOddsForFixture' qui a été ajoutée dans ApiFootball.service
         const oddsData = await apiFootballService.getOddsForFixture(prediction.fixtureId);
+        
         if (oddsData && oddsData.length > 0) {
             const parsedOdds = parseOdds(oddsData);
 
             if (!prediction.market) {
-                console.log(chalk.red(`  -> Marché manquant pour la prédiction ${prediction.id}. Saut.`));
+                console.log(chalk.red(`   -> Marché manquant pour la prédiction ${prediction.id}. Saut.`));
                 continue;
             }
             const market = prediction.market;
             const oddForMarket = parsedOdds[market];
 
             if (oddForMarket) {
-                console.log(chalk.green(`  -> Cote trouvée pour le marché ${market}. Mise à jour de la prédiction.`));
+                console.log(chalk.green(`   -> Cote trouvée pour le marché ${market}. Mise à jour de la prédiction.`));
                 await firestoreService.updatePrediction(prediction.id, {
                     odd: oddForMarket,
                     status: 'ELIGIBLE'
@@ -94,10 +101,10 @@ export async function runPredictionCompleter() {
                 }
 
             } else {
-                console.log(chalk.yellow(`  -> Aucune cote trouvée pour le marché spécifique ${market}.`));
+                console.log(chalk.yellow(`   -> Aucune cote trouvée pour le marché spécifique ${market}.`));
             }
         } else {
-            console.log(chalk.red(`  -> Aucune donnée de cote trouvée pour le match.`));
+            console.log(chalk.red(`   -> Aucune donnée de cote trouvée pour le match.`));
         }
     }
 

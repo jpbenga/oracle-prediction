@@ -1,5 +1,8 @@
+// backend-gcp/microservice-football/src/jobs/prediction.job.ts
+
 import chalk from 'chalk';
-import { LEAGUES_TO_ANALYZE, LOW_OCCURRENCE_MARKETS } from '../config/football.config';
+// CORRECTION : Import de l'objet de configuration unique
+import { footballConfig } from '../config/football.config';
 import { apiFootballService } from '../services/ApiFootball.service';
 import { gestionJourneeService } from '../services/GestionJournee.service';
 import { analyseMatchService } from '../services/AnalyseMatch.service';
@@ -76,9 +79,11 @@ export async function runPrediction(options?: { leagueId?: string, matchdayNumbe
     const season = new Date().getFullYear();
     let totalPredictionsSaved = 0;
 
-    let leaguesToProcess = LEAGUES_TO_ANALYZE;
+    // CORRECTION : Utilisation de la configuration importée
+    let leaguesToProcess = footballConfig.leaguesToAnalyze;
     if (options?.leagueId) {
-        const specificLeague = LEAGUES_TO_ANALYZE.find((l) => l.id === parseInt(options.leagueId || '', 10));
+        // CORRECTION : Ajout du type pour 'l'
+        const specificLeague = footballConfig.leaguesToAnalyze.find((l: { id: number; name: string }) => l.id === parseInt(options.leagueId || '', 10));
         if (specificLeague) {
             leaguesToProcess = [specificLeague];
             console.log(chalk.yellow(`Exécution ciblée pour la ligue : ${specificLeague.name}`));
@@ -106,6 +111,7 @@ export async function runPrediction(options?: { leagueId?: string, matchdayNumbe
             const homeTeamId = match.teams.home.id;
             const awayTeamId = match.teams.away.id;
 
+            // CORRECTION : Les méthodes existent maintenant dans le service ApiFootball
             const [homeStats, awayStats, oddsData]: [TeamStats | null, TeamStats | null, any[] | null] = await Promise.all([
                 apiFootballService.getTeamStats(homeTeamId, league.id, season),
                 apiFootballService.getTeamStats(awayTeamId, league.id, season),
@@ -121,7 +127,7 @@ export async function runPrediction(options?: { leagueId?: string, matchdayNumbe
                 const matchesPlayed = homeStats.fixtures.played.total;
                 
                 if (matchesPlayed < 6) {
-                    console.log(chalk.yellow(`      -> Début de saison détecté (${matchesPlayed} matchs). Application des corrections.`));
+                    console.log(chalk.yellow(`       -> Début de saison détecté (${matchesPlayed} matchs). Application des corrections.`));
                     const [prevHomeStats, prevAwayStats]: [TeamStats | null, TeamStats | null] = await Promise.all([
                         apiFootballService.getTeamStats(homeTeamId, league.id, season - 1),
                         apiFootballService.getTeamStats(awayTeamId, league.id, season - 1)
@@ -166,14 +172,15 @@ export async function runPrediction(options?: { leagueId?: string, matchdayNumbe
                 let confidenceScores: { [key: string]: number } = predictionResult.markets;
 
                 for (const market in confidenceScores) {
-                    if (LOW_OCCURRENCE_MARKETS.includes(market)) {
+                    // CORRECTION : Utilisation de la configuration importée
+                    if (footballConfig.lowOccurrenceMarkets.includes(market)) {
                         delete confidenceScores[market];
                     }
                 }
 
                 const maxConfidence = Math.max(...Object.values(confidenceScores));
                 if (maxConfidence < 60) {
-                    console.warn(`      -> Match exclu : aucune prédiction avec confiance ≥ 60%.`);
+                    console.warn(`       -> Match exclu : aucune prédiction avec confiance ≥ 60%.`);
                     continue;
                 }
                 
@@ -204,12 +211,12 @@ export async function runPrediction(options?: { leagueId?: string, matchdayNumbe
                         await firestoreService.savePrediction(predictionData);
                         savedCount++;
                     } else {
-                        console.error('      [ERREUR] firestoreService.savePrediction non disponible!');
+                        console.error('       [ERREUR] firestoreService.savePrediction non disponible!');
                     }
                 }
                 
                 if (savedCount > 0) {
-                    console.log(chalk.magenta(`      -> ${savedCount} prédictions sauvegardées dans Firestore.`));
+                    console.log(chalk.magenta(`         -> ${savedCount} prédictions sauvegardées dans Firestore.`));
                     totalPredictionsSaved += savedCount;
                 }
 

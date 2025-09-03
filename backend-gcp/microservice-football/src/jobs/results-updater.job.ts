@@ -1,46 +1,54 @@
+// backend-gcp/microservice-football/src/jobs/results-updater.job.ts
+
 import chalk from 'chalk';
 import { firestoreService } from '../services/Firestore.service';
 import { apiFootballService } from '../services/ApiFootball.service';
+// CORRECTION : Import des types nécessaires
+import { Match, PredictionDocument } from '../types/football.types';
 
 export async function runResultsUpdater() {
     console.log(chalk.blue.bold("--- Démarrage du Job de Mise à Jour des Résultats ---"));
 
-    console.log(chalk.cyan("\nÉtape 1/2 : Vérification des pronostics en attente..."));
-    const pendingPredictions = await firestoreService.getPendingPredictions();
+    const { predictions, tickets } = await firestoreService.getPendingItems();
+    
+    // CORRECTION : On caste la liste de prédictions avec notre nouveau type
+    const pendingPredictions = predictions as PredictionDocument[];
+    const pendingTickets = tickets; // Le type pour les tickets peut être ajouté de la même manière si besoin
 
+    console.log(chalk.cyan("\nÉtape 1/2 : Vérification des pronostics en attente..."));
     if (pendingPredictions.length === 0) {
         console.log(chalk.yellow("Aucun pronostic en attente trouvé."));
     } else {
         console.log(chalk.cyan(`${pendingPredictions.length} pronostics en attente à traiter.`));
         for (const prediction of pendingPredictions) {
-            console.log(chalk.cyan(`  -> Traitement du pronostic : ${prediction.matchLabel} (ID: ${prediction.id})`));
-            const matchResultData = await apiFootballService.getFixtureResult(prediction.fixtureId);
-            const matchResult = matchResultData && matchResultData.length > 0 ? matchResultData[0] : null;
+            console.log(chalk.cyan(`   -> Traitement du pronostic : ${prediction.matchLabel} (ID: ${prediction.id})`));
+            
+            const matchResult = await apiFootballService.getMatchById(prediction.fixtureId);
 
             if (matchResult && matchResult.fixture.status.short === 'FT') {
+                // L'erreur est maintenant résolue car 'prediction' est du bon type
                 const didWin = determinePredictionStatus(prediction, matchResult);
                 if (didWin !== null) {
                     const newStatus = didWin ? 'WON' : 'LOST';
                     await firestoreService.updatePrediction(prediction.id, { status: newStatus });
-                    console.log(chalk.green(`    -> Pronostic ${prediction.id} mis à jour au statut : ${newStatus}`));
+                    console.log(chalk.green(`     -> Pronostic ${prediction.id} mis à jour au statut : ${newStatus}`));
                 } else {
-                    console.log(chalk.gray(`    -> Logique de marché non implémentée pour ${prediction.market}. Pronostic ignoré.`));
+                    console.log(chalk.gray(`     -> Logique de marché non implémentée pour ${prediction.market}. Pronostic ignoré.`));
                 }
             } else {
-                console.log(chalk.yellow(`    -> Résultat non disponible ou match non terminé pour ${prediction.id}.`));
+                console.log(chalk.yellow(`     -> Résultat non disponible ou match non terminé pour ${prediction.id}.`));
             }
         }
     }
 
+    // ... La logique pour les tickets reste la même
     console.log(chalk.cyan("\nÉtape 2/2 : Vérification des tickets en attente..."));
-    const pendingTickets = await firestoreService.getPendingTickets();
-
     if (pendingTickets.length === 0) {
         console.log(chalk.yellow("Aucun ticket en attente trouvé."));
     } else {
         console.log(chalk.cyan(`${pendingTickets.length} tickets en attente à traiter.`));
         for (const ticket of pendingTickets) {
-            console.log(chalk.cyan(`  -> Traitement du ticket : ${ticket.id}`));
+            console.log(chalk.cyan(`   -> Traitement du ticket : ${ticket.id}`));
             if (!ticket.bet_refs || ticket.bet_refs.length === 0) continue;
 
             const allBetsStatus = await Promise.all(ticket.bet_refs.map(async (betRef: { get: () => any; }) => {
@@ -48,17 +56,17 @@ export async function runResultsUpdater() {
                 return predictionDoc.exists ? predictionDoc.data()?.status : 'PENDING';
             }));
             
-            const isFinished = allBetsStatus.every((status) => status === 'WON' || status === 'LOST');
+            const isFinished = allBetsStatus.every((status: string) => status === 'WON' || status === 'LOST');
             
             if (isFinished) {
-                let newTicketStatus = 'LOST';
-                if (allBetsStatus.every((status) => status === 'WON')) {
+                let newTicketStatus: 'WON' | 'LOST' = 'LOST';
+                if (allBetsStatus.every((status: string) => status === 'WON')) {
                     newTicketStatus = 'WON';
                 }
-                await firestoreService.updateTicket(ticket.id, { status: newTicketStatus });
-                console.log(chalk.green(`    -> Ticket ${ticket.id} mis à jour au statut : ${newTicketStatus}`));
+                await firestoreService.updateTicketStatus(ticket.id, newTicketStatus);
+                console.log(chalk.green(`     -> Ticket ${ticket.id} mis à jour au statut : ${newTicketStatus}`));
             } else {
-                console.log(chalk.yellow(`    -> Le ticket ${ticket.id} contient encore des pronostics en attente.`));
+                console.log(chalk.yellow(`     -> Le ticket ${ticket.id} contient encore des pronostics en attente.`));
             }
         }
     }
@@ -66,7 +74,8 @@ export async function runResultsUpdater() {
     console.log(chalk.blue.bold("\n--- Job de Mise à Jour des Résultats Terminé ---"));
 }
 
-function determinePredictionStatus(prediction: { market: string; odd: any; }, matchResult: { goals: { home: any; away: any; }; }) {
+// CORRECTION : La fonction accepte maintenant le type PredictionDocument
+function determinePredictionStatus(prediction: PredictionDocument, matchResult: Match) {
     const homeGoals = matchResult.goals.home;
     const awayGoals = matchResult.goals.away;
 
@@ -75,13 +84,13 @@ function determinePredictionStatus(prediction: { market: string; odd: any; }, ma
     switch (prediction.market) {
         case 'favorite_win':
             const homeOdd = prediction.odd;
-            const awayOdd = 2; 
-            const isHomeFavorite = homeOdd < awayOdd;
+            const awayOdd = 2;
+            const isHomeFavorite = homeOdd ? homeOdd < awayOdd : false;
             return (isHomeFavorite && homeGoals > awayGoals) || (!isHomeFavorite && awayGoals > homeGoals);
         case 'outsider_win':
             const homeOddOutsider = 2;
             const awayOddOutsider = prediction.odd;
-            const isAwayFavorite = awayOddOutsider < homeOddOutsider;
+            const isAwayFavorite = awayOddOutsider ? awayOddOutsider < homeOddOutsider : false;
             return (isAwayFavorite && homeGoals > awayGoals) || (!isAwayFavorite && awayGoals > homeGoals);
         case 'draw':
             return homeGoals === awayGoals;

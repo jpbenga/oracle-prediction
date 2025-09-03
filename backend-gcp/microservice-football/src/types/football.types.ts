@@ -11,9 +11,95 @@ export interface Prediction {
   isEarlySeason: boolean;
 }
 
+export interface Match {
+    fixture: {
+      id: number;
+      date: string;
+      venue: {
+        name: string | null;
+        city: string | null;
+      };
+      status: {
+        long: string;
+        short: string;
+        elapsed: number | null;
+      };
+    };
+    league: {
+      id: number;
+      name: string;
+      country: string;
+      logo: string;
+      flag: string;
+      season: number;
+      round: string;
+    };
+    teams: {
+      home: {
+        id: number;
+        name: string;
+        logo: string;
+        winner: boolean | null;
+      };
+      away: {
+        id: number;
+        name: string;
+        logo: string;
+        winner: boolean | null;
+      };
+    };
+    goals: {
+      home: number | null;
+      away: number | null;
+    };
+    score: {
+      halftime: {
+        home: number | null;
+        away: number | null;
+      };
+      fulltime: {
+        home: number | null;
+        away: number | null;
+      };
+      extratime: {
+        home: number | null;
+        away: number | null;
+      };
+      penalty: {
+        home: number | null;
+        away: number | null;
+      };
+    };
+  }
+
 export interface PredictionsData {
     [leagueName: string]: Prediction[];
 }
+
+export interface BacktestResult {
+    matchId: number;
+    matchLabel: string;
+    matchDate: string;
+    markets: Array<{
+      market: string;
+      prediction: number;
+      result: 'WON' | 'LOST' | 'PENDING';
+    }>;
+  }
+
+  export interface PredictionDocument {
+    id: string;
+    fixtureId: number;
+    matchLabel: string;
+    matchDate: string;
+    leagueId: number;
+    leagueName: string;
+    market: string;
+    score: number;
+    odd: number | null;
+    status: 'ELIGIBLE' | 'INCOMPLETE' | 'PENDING' | 'WON' | 'LOST';
+    createdAt: string;
+  }
 
 export interface Bet {
     id: string;
