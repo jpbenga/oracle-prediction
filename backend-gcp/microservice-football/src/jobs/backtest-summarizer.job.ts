@@ -63,12 +63,16 @@ export async function runBacktestSummarizer() {
             }
 
             const trancheKey = getTrancheKey(prediction);
+            // CORRECTION : On s'assure que la trancheKey n'est pas null avant de continuer.
             if (trancheKey) {
                 const tranche = summary.perMarketSummary[market][trancheKey];
-                tranche.total++;
-                tranche.avgPredicted += prediction;
-                if (winStatus === 'WON') {
-                    tranche.success++;
+                // Cette vérification est une sécurité supplémentaire, bien que 'tranche' devrait toujours exister ici.
+                if (tranche) { 
+                    tranche.total++;
+                    tranche.avgPredicted += prediction;
+                    if (winStatus === 'WON') {
+                        tranche.success++;
+                    }
                 }
             }
         }
