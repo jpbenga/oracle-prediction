@@ -1,11 +1,10 @@
-// backend-gcp/microservice-football/src/services/Firestore.service.ts
-
 import { Firestore, DocumentData } from '@google-cloud/firestore';
 import chalk from 'chalk';
-import { BacktestResult } from '../types/football.types';
+import { BacktestResult, BacktestBilan } from '../types/football.types';
 
 class FirestoreService {
   private db: Firestore;
+  private readonly BACKTEST_SUMMARY_DOC_PATH = 'system_reports/backtest_summary';
 
   constructor() {
     this.db = new Firestore();
@@ -22,6 +21,7 @@ class FirestoreService {
     }
   }
 
+  // ... [Méthodes existantes pour league_status, predictions, tickets]
   public async getLeagueStatus(leagueId: string): Promise<DocumentData | null> {
     const docRef = this.db.collection('leagues_status').doc(String(leagueId));
     const doc = await docRef.get();
@@ -93,18 +93,34 @@ class FirestoreService {
       await this.db.collection('tickets').doc(ticketId).update({ status });
   }
 
-  public async saveBacktest(backtestData: any): Promise<string> {
-    const docRef = await this.db.collection('backtests').add(backtestData);
-    console.log(chalk.green(`[Firestore Service] SUCCÈS: Backtest ${docRef.id} sauvegardé.`));
+
+  // ====================================================================
+  // MÉTHODES POUR LE BACKTESTING
+  // ====================================================================
+
+  public async saveBacktestResult(result: BacktestResult): Promise<string> {
+    const docRef = await this.db.collection('backtests').add(result);
     return docRef.id;
   }
-  
-  public async saveBacktestResult(result: BacktestResult): Promise<string> {
-    return this.saveBacktest(result);
+
+  public async getAllBacktestResults(): Promise<BacktestResult[]> {
+    const snapshot = await this.db.collection('backtests').get();
+    return snapshot.docs.map(doc => doc.data() as BacktestResult);
   }
-    
+
+  public async saveBacktestSummary(summary: BacktestBilan): Promise<void> {
+    const docRef = this.db.doc(this.BACKTEST_SUMMARY_DOC_PATH);
+    await docRef.set(summary);
+  }
+
+  public async getBacktestSummary(): Promise<BacktestBilan | null> {
+    const docRef = this.db.doc(this.BACKTEST_SUMMARY_DOC_PATH);
+    const doc = await docRef.get();
+    return doc.exists ? (doc.data() as BacktestBilan) : null;
+  }
+
   // ====================================================================
-  // MÉTHODES AJOUTÉES POUR LES ROUTES API
+  // MÉTHODES POUR L'API (si nécessaire)
   // ====================================================================
   public async getTicketsForDate(date: string): Promise<DocumentData[]> {
     const snapshot = await this.db.collection('tickets')

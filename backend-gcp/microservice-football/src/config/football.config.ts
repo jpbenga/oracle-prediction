@@ -52,13 +52,5 @@ export const footballConfig = {
       { name: 'Premier League (Ukraine)', id: 235 }
     ],
   
-    /**
-     * Marchés considérés comme ayant une faible occurrence, à traiter différemment.
-     */
-    lowOccurrenceMarkets: [
-      'away_ht_over_3.5',
-      'home_ht_over_3.5',
-      'away_st_over_3.5',
-      'home_st_over_3.5',
-    ],
+    
   };

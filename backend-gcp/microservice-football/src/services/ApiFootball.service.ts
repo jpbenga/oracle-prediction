@@ -3,6 +3,8 @@ import chalk from 'chalk';
 import { Match } from '../types/football.types';
 import { footballConfig } from '../config/football.config';
 
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 class ApiFootballService {
   private api: AxiosInstance;
 
@@ -13,17 +15,26 @@ class ApiFootballService {
         'x-rapidapi-host': footballConfig.apiHost,
         'x-rapidapi-key': footballConfig.apiKey,
       },
+      timeout: 20000, // Ajout d'un timeout
     });
   }
 
   private async makeRequest<T>(endpoint: string, params: Record<string, any>): Promise<T | null> {
-    try {
-      const response = await this.api.get(endpoint, { params });
-      return response.data.response;
-    } catch (error) {
-      console.error(chalk.red(`Erreur API (${endpoint}):`), error);
-      return null;
+    let attempts = 0;
+    while (attempts < footballConfig.maxApiAttempts) {
+      attempts++;
+      try {
+        const response = await this.api.get(endpoint, { params });
+        if (response.data && response.data.response) {
+          return response.data.response;
+        }
+      } catch (error) {
+        console.log(chalk.yellow(`      -> Tentative API ${attempts}/${footballConfig.maxApiAttempts} (${endpoint}) échouée`));
+      }
+      if (attempts < footballConfig.maxApiAttempts) await sleep(1500);
     }
+    console.log(chalk.red(`      -> ERREUR FINALE: Impossible de récupérer les données pour ${endpoint} après ${footballConfig.maxApiAttempts} tentatives.`));
+    return null;
   }
 
   async getTeamStats(teamId: number, leagueId: number, season: number): Promise<any> {
