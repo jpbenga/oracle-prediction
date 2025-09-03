@@ -54,27 +54,33 @@ export async function runBacktestSummarizer() {
     };
 
     for (const result of allBacktestResults) {
-        for (const marketData of result.markets) {
-            const { market, prediction, result: winStatus } = marketData;
+        // CORRECTION : On vérifie que result.markets est bien un tableau avant de l'itérer.
+        if (result && Array.isArray(result.markets)) {
+            for (const marketData of result.markets) {
+                const { market, prediction, result: winStatus } = marketData;
 
-            // Initialiser le marché s'il n'existe pas
-            if (!summary.perMarketSummary[market]) {
-                summary.perMarketSummary[market] = initTrancheAnalysis();
-            }
+                if (!market || typeof prediction !== 'number' || !winStatus) {
+                    continue; // Ignorer les données de marché malformées
+                }
 
-            const trancheKey = getTrancheKey(prediction);
-            // CORRECTION : On s'assure que la trancheKey n'est pas null avant de continuer.
-            if (trancheKey) {
-                const tranche = summary.perMarketSummary[market][trancheKey];
-                // Cette vérification est une sécurité supplémentaire, bien que 'tranche' devrait toujours exister ici.
-                if (tranche) { 
-                    tranche.total++;
-                    tranche.avgPredicted += prediction;
-                    if (winStatus === 'WON') {
-                        tranche.success++;
+                if (!summary.perMarketSummary[market]) {
+                    summary.perMarketSummary[market] = initTrancheAnalysis();
+                }
+
+                const trancheKey = getTrancheKey(prediction);
+                if (trancheKey) {
+                    const tranche = summary.perMarketSummary[market][trancheKey];
+                    if (tranche) {
+                        tranche.total++;
+                        tranche.avgPredicted += prediction;
+                        if (winStatus === 'WON') {
+                            tranche.success++;
+                        }
                     }
                 }
             }
+        } else {
+            console.warn(chalk.yellow(`[Summarizer] Document ignoré car 'markets' n'est pas un tableau itérable. Données: ${JSON.stringify(result)}`));
         }
     }
 
