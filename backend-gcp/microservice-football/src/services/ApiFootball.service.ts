@@ -53,8 +53,8 @@ class ApiFootballService {
     return this.makeRequest<Match[]>('/fixtures', { league: leagueId, season, round });
   }
 
-  async getMatchesByDateRange(fromDate: string, toDate: string): Promise<Match[] | null> {
-    return this.makeRequest<Match[]>('/fixtures', { from: fromDate, to: toDate });
+  async getMatchesByDateRange(fromDate: string, toDate: string, leagueId: number, season: number): Promise<Match[] | null> {
+    return this.makeRequest<Match[]>('/fixtures', { from: fromDate, to: toDate, league: leagueId, season: season });
   }
 
   async getMatchById(matchId: number): Promise<Match | null> {
