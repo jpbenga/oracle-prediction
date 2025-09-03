@@ -9,12 +9,14 @@ import { runTicketGenerator } from './jobs/ticket-generator.job';
 import { runResultsUpdater } from './jobs/results-updater.job';
 import { runBacktestOrchestrator } from './jobs/backtest-orchestrator.job';
 import { BacktestWorkerMessage, runBacktestWorker } from './jobs/backtest-worker.job';
-import { firestoreService } from './services/Firestore.service'; // Ajout pour les routes API
+import { runBacktestSummarizer } from './jobs/backtest-summarizer.job';
+import { firestoreService } from './services/Firestore.service';
 
 const app = express();
 app.use(express.json());
 
 // --- Configuration CORS ---
+// ... (votre configuration CORS reste la même)
 const allowedOrigins = [
     process.env.CORS_ORIGIN || 'http://localhost:4200',
     'https://4200-firebase-oracle-prediction-1756797510260.cluster-64pjnskmlbaxowh5lzq6i7v4ra.cloudworkstations.dev'
@@ -34,15 +36,15 @@ app.use(cors(corsOptions));
 const PORT = process.env.PORT || 8080;
 
 // ====================================================================
-// ENDPOINT POUR DÉCLENCHER L'ORCHESTRATEUR (SERVICE PRINCIPAL)
+// ENDPOINT POUR LE JOB SCHEDULER PRINCIPAL
 // ====================================================================
 app.get('/run-all-jobs', async (req, res) => {
   console.log(chalk.magenta.bold('--- Déclenchement de la séquence de jobs ---'));
   try {
-    // On lance l'orchestrateur de backtest. C'est très rapide.
+    // L'orchestrateur de backtest est rapide, il ne fait que publier des messages.
     await runBacktestOrchestrator();
 
-    // On peut lancer les autres jobs courts en parallèle
+    // Les autres jobs sont également rapides et peuvent être lancés en parallèle.
     await Promise.all([
       runLeagueOrchestrator(),
       runPredictionCompleter(),
@@ -50,7 +52,7 @@ app.get('/run-all-jobs', async (req, res) => {
       runResultsUpdater(),
     ]);
 
-    res.status(202).send('La séquence de jobs a été démarrée avec succès.');
+    res.status(202).send('La séquence de jobs a été démarrée avec succès. Les workers de backtest s\'exécuteront en arrière-plan.');
   } catch (error) {
     console.error(chalk.red('Erreur lors du déclenchement des jobs :'), error);
     res.status(500).send('Échec du démarrage des jobs.');
@@ -60,7 +62,7 @@ app.get('/run-all-jobs', async (req, res) => {
 // ====================================================================
 // ENDPOINT POUR LE WORKER (DÉCLENCHÉ PAR PUB/SUB)
 // ====================================================================
-app.post('/', async (req, res) => {
+app.post('/pubsub-backtest-worker', async (req, res) => {
   if (!req.body || !req.body.message) {
     const errorMessage = 'Requête invalide : corps ou message manquant.';
     console.error(chalk.red(errorMessage));
@@ -71,13 +73,33 @@ app.post('/', async (req, res) => {
     const messageData = Buffer.from(req.body.message.data, 'base64').toString('utf-8');
     const messagePayload = JSON.parse(messageData) as BacktestWorkerMessage;
 
-    await runBacktestWorker(messagePayload);
-    res.status(204).send();
+    // Lancement du worker. On ne met PAS await pour que la réponse soit immédiate.
+    // Cloud Run gérera l'exécution en arrière-plan.
+    runBacktestWorker(messagePayload); 
+    
+    // On répond immédiatement à Pub/Sub pour qu'il sache que le message a été reçu.
+    res.status(204).send(); 
   } catch (error) {
     console.error(chalk.red('Erreur dans le worker Pub/Sub :'), error);
+    // On répond avec une erreur pour que Pub/Sub puisse tenter de renvoyer le message.
     res.status(500).send('Échec du traitement du message.');
   }
 });
+
+// ====================================================================
+// ENDPOINT POUR LE JOB SCHEDULER SECONDAIRE (RÉSUMÉ)
+// ====================================================================
+app.get('/run-backtest-summarizer', async (req, res) => {
+    console.log(chalk.magenta.bold('--- Déclenchement du job de résumé du backtest ---'));
+    try {
+        await runBacktestSummarizer();
+        res.status(200).send('Le résumé du backtest a été généré avec succès.');
+    } catch (error) {
+        console.error(chalk.red('Erreur lors de la génération du résumé du backtest :'), error);
+        res.status(500).send('Échec de la génération du résumé.');
+    }
+});
+
 
 // ====================================================================
 // ROUTES API POUR LE FRONT-END
@@ -85,7 +107,7 @@ app.post('/', async (req, res) => {
 app.get('/api/tickets', async (req, res) => {
     try {
         const date = typeof req.query.date === 'string' ? req.query.date : new Date().toISOString().split('T')[0];
-        const tickets = await firestoreService.getTicketsForDate(date); // Assurez-vous que cette méthode existe
+        const tickets = await firestoreService.getTicketsForDate(date);
         if (tickets.length > 0) {
             res.status(200).json(tickets);
         } else {
@@ -99,7 +121,7 @@ app.get('/api/tickets', async (req, res) => {
 app.get('/api/predictions', async (req, res) => {
     try {
         const date = typeof req.query.date === 'string' ? req.query.date : new Date().toISOString().split('T')[0];
-        const predictions = await firestoreService.getPredictionsForDate(date); // Assurez-vous que cette méthode existe
+        const predictions = await firestoreService.getPredictionsForDate(date);
         if (predictions.length > 0) {
             res.status(200).json(predictions);
         } else {
