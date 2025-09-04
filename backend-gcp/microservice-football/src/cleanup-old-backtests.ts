@@ -54,9 +54,9 @@ async function run() {
   // Pour éviter une exécution accidentelle, la ligne de commande est commentée.
   // Décommentez la ligne ci-dessous pour procéder à la suppression.
   
-  // await deleteCollection(COLLECTION_TO_DELETE);
+  await deleteCollection(COLLECTION_TO_DELETE);
 
-  console.log(chalk.blue('Pour exécuter la suppression, décommentez la ligne "await deleteCollection..." dans ce script et relancez-le.'));
+  // console.log(chalk.blue('Pour exécuter la suppression, décommentez la ligne "await deleteCollection..." dans ce script et relancez-le.'));
   console.log(chalk.red.bold('--- FIN DU SCRIPT ---'));
 }
 

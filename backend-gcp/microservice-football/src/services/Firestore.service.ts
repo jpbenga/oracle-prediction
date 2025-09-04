@@ -99,7 +99,10 @@ class FirestoreService {
   // ====================================================================
 
   public async saveBacktestResult(result: BacktestResult): Promise<string> {
-    const docRef = await this.db.collection('backtest_results').add(result);
+    // Utiliser l'ID du match comme ID de document pour éviter les doublons.
+    // La méthode .set() crée le document s'il n'existe pas, ou l'écrase s'il existe.
+    const docRef = this.db.collection('backtest_results').doc(String(result.matchId));
+    await docRef.set(result);
     return docRef.id;
   }
 
@@ -121,6 +124,12 @@ class FirestoreService {
     const docRef = this.db.doc(this.BACKTEST_SUMMARY_DOC_PATH);
     const doc = await docRef.get();
     return doc.exists ? (doc.data() as BacktestBilan) : null;
+  }
+
+  public async saveWhitelist(whitelist: { [market: string]: string[] }): Promise<void> {
+    const docRef = this.db.collection('strategy').doc('whitelist');
+    await docRef.set(whitelist);
+    console.log(chalk.green('[Firestore Service] Whitelist sauvegardée avec succès.'));
   }
 
   // ====================================================================

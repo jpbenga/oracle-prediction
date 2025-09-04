@@ -97,9 +97,36 @@ export async function runBacktestSummarizer() {
 
     console.log(chalk.green("Agrégation terminée."));
 
-    // 4. Sauvegarder le bilan consolidé dans Firestore
+    // 4. Générer la whitelist
+    console.log(chalk.cyan("Génération de la whitelist basée sur la stratégie (taux de réussite > 85% et min 10 paris)..."));
+    const MIN_BETS_FOR_WHITELIST = 10;
+    const WHITELIST_SUCCESS_RATE = 0.85;
+    const whitelist: { [market: string]: string[] } = {};
+
+    for (const market in summary.perMarketSummary) {
+        for (const key in summary.perMarketSummary[market]) {
+            const trancheKey = key as keyof TrancheAnalysis;
+            const tranche = summary.perMarketSummary[market][trancheKey];
+
+            if (tranche.total >= MIN_BETS_FOR_WHITELIST) {
+                const successRate = tranche.success / tranche.total;
+                if (successRate > WHITELIST_SUCCESS_RATE) {
+                    if (!whitelist[market]) {
+                        whitelist[market] = [];
+                    }
+                    whitelist[market].push(trancheKey);
+                    console.log(chalk.green(`  -> [WHITELIST] Ajout de "${market}" | tranche "${trancheKey}" (Taux: ${(successRate * 100).toFixed(2)}%, Total: ${tranche.total})`));
+                }
+            }
+        }
+    }
+
+    // 5. Sauvegarder le bilan et la whitelist
     await firestoreService.saveBacktestSummary(summary);
-    console.log(chalk.magenta.bold("-> Bilan du backtest sauvegardé avec succès dans Firestore."));
+    console.log(chalk.magenta.bold("-> Bilan du backtest sauvegardé avec succès."));
+
+    await firestoreService.saveWhitelist(whitelist);
+    console.log(chalk.magenta.bold(`-> Whitelist sauvegardée avec ${Object.keys(whitelist).length} marchés.`));
 
     console.log(chalk.blue.bold("--- Job d'Agrégation du Backtest Terminé ---"));
 }

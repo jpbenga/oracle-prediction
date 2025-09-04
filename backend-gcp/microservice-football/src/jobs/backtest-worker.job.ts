@@ -109,15 +109,13 @@ export async function runBacktestWorker(message: BacktestWorkerMessage) {
         const actualResult = actualResults[market];
 
         if (predictionScore !== undefined && actualResult !== undefined) {
-            // On ne backteste que les prédictions où on a une confiance d'au moins 60%
-            if (predictionScore >= 60) {
-                backtestData.markets.push({
-                    market: market,
-                    prediction: predictionScore,
-                    // Le résultat est "WON" si la prédiction (implicitement "vrai") correspond au résultat réel (qui est "vrai")
-                    result: actualResult ? 'WON' : 'LOST',
-                });
-            }
+            // On enregistre TOUS les marchés, sans filtre de score, pour une analyse complète.
+            backtestData.markets.push({
+                market: market,
+                prediction: predictionScore,
+                // Le résultat est "WON" si la prédiction (implicitement "vrai") correspond au résultat réel (qui est "vrai")
+                result: actualResult ? 'WON' : 'LOST',
+            });
         }
     }
 
@@ -125,7 +123,7 @@ export async function runBacktestWorker(message: BacktestWorkerMessage) {
       await firestoreService.saveBacktestResult(backtestData);
       console.log(chalk.green(`[Worker] -> Résultat du backtest pour le match ${matchId} sauvegardé avec ${backtestData.markets.length} marchés.`));
     } else {
-      console.log(chalk.yellow(`[Worker] -> Pas de résultat de backtest à sauvegarder pour ${matchId} (aucun marché avec confiance >= 60%).`));
+      console.log(chalk.yellow(`[Worker] -> Pas de résultat de backtest à sauvegarder pour ${matchId} (aucun marché analysé).`));
     }
 
     console.log(chalk.blue.bold(`--- [Worker] Analyse du match ${matchId} terminée avec succès. ---`));
