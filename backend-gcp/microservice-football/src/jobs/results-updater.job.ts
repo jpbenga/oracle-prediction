@@ -27,18 +27,21 @@ export async function runResultsUpdater() {
             
             const matchResult = await apiFootballService.getMatchById(prediction.fixtureId);
 
-            if (matchResult && matchResult.fixture.status.short === 'FT') {
-                // L'erreur est maintenant résolue car 'prediction' est du bon type
-                const didWin = determinePredictionStatus(prediction, matchResult);
-                if (didWin !== null) {
-                    const newStatus = didWin ? 'WON' : 'LOST';
-                    await firestoreService.updatePrediction(prediction.id, { status: newStatus });
-                    console.log(chalk.green(`     -> Pronostic ${prediction.id} mis à jour au statut : ${newStatus}`));
+            if (matchResult) {
+                if (matchResult.fixture.status.short === 'FT') {
+                    const didWin = determinePredictionStatus(prediction, matchResult);
+                    if (didWin !== null) {
+                        const newStatus = didWin ? 'WON' : 'LOST';
+                        await firestoreService.updatePrediction(prediction.id, { status: newStatus });
+                        console.log(chalk.green(`     -> Pronostic ${prediction.id} mis à jour au statut : ${newStatus}`));
+                    } else {
+                        console.log(chalk.gray(`     -> Logique de marché non implémentée pour ${prediction.market}. Pronostic ignoré.`));
+                    }
                 } else {
-                    console.log(chalk.gray(`     -> Logique de marché non implémentée pour ${prediction.market}. Pronostic ignoré.`));
+                    console.log(chalk.yellow(`     -> Résultat non disponible pour ${prediction.id}. Statut du match: '${matchResult.fixture.status.short}' (attendu: 'FT').`));
                 }
             } else {
-                console.log(chalk.yellow(`     -> Résultat non disponible ou match non terminé pour ${prediction.id}.`));
+                console.log(chalk.red(`     -> Impossible de récupérer le résultat du match pour le pronostic ${prediction.id} (après plusieurs tentatives).`));
             }
             // Ajout d'une pause pour respecter les limites de l'API
             await sleep(500);

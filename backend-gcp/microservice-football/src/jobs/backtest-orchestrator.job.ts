@@ -49,21 +49,24 @@ export async function runBacktestOrchestrator() {
 
     let publishedCount = 0;
     for (const match of allMatches) {
-      // L'orchestrateur récupère les détails complets du match
       const matchDetails = await apiFootballService.getMatchById(match.fixture.id);
       
-      if (matchDetails && matchDetails.fixture.status.short === 'FT') {
-        const messageData = JSON.stringify({ match: matchDetails }); // Envoyer l'objet match complet
-        const dataBuffer = Buffer.from(messageData);
+      if (matchDetails) {
+        if (matchDetails.fixture.status.short === 'FT') {
+          const messageData = JSON.stringify({ match: matchDetails }); // Envoyer l'objet match complet
+          const dataBuffer = Buffer.from(messageData);
 
-        try {
-          await pubSubClient.topic(topicName).publishMessage({ data: dataBuffer });
-          publishedCount++;
-        } catch (error) {
-          console.error(chalk.red(`Erreur lors de la publication du message pour le match ${match.fixture.id}:`), error);
+          try {
+            await pubSubClient.topic(topicName).publishMessage({ data: dataBuffer });
+            publishedCount++;
+          } catch (error) {
+            console.error(chalk.red(`Erreur lors de la publication du message pour le match ${match.fixture.id}:`), error);
+          }
+        } else {
+          console.log(chalk.yellow(`  -> Match ${match.fixture.id} ignoré car son statut est '${matchDetails.fixture.status.short}' (attendu: 'FT').`));
         }
       } else {
-        console.log(chalk.yellow(`  -> Match ${match.fixture.id} ignoré (non trouvé ou non terminé).`));
+        console.log(chalk.red(`  -> Match ${match.fixture.id} non trouvé via l'API (après ${footballConfig.maxApiAttempts} tentatives). Ignoré.`));
       }
       // Pause pour respecter le rate limiting de l'API
       await sleep(200); 

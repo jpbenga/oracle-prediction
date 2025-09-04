@@ -28,8 +28,23 @@ class ApiFootballService {
         if (response.data && response.data.response) {
           return response.data.response;
         }
-      } catch (error) {
-        console.log(chalk.yellow(`      -> Tentative API ${attempts}/${footballConfig.maxApiAttempts} (${endpoint}) échouée`));
+      } catch (error: any) {
+        let errorMessage = 'Erreur inconnue';
+        if (axios.isAxiosError(error)) {
+          if (error.response) {
+            // L'API a répondu avec un code d'erreur (4xx, 5xx)
+            errorMessage = `Statut ${error.response.status} - ${JSON.stringify(error.response.data)}`;
+          } else if (error.request) {
+            // La requête a été faite mais aucune réponse n'a été reçue
+            errorMessage = "Aucune réponse reçue de l'API (timeout probable)";
+          } else {
+            // Une erreur s'est produite lors de la configuration de la requête
+            errorMessage = error.message;
+          }
+        } else {
+          errorMessage = (error as Error).message;
+        }
+        console.log(chalk.yellow(`      -> Tentative API ${attempts}/${footballConfig.maxApiAttempts} (${endpoint}) échouée. Raison: ${errorMessage}`));
       }
       if (attempts < footballConfig.maxApiAttempts) await sleep(1500);
     }
