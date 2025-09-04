@@ -49,24 +49,25 @@ export async function runBacktestOrchestrator() {
 
     let publishedCount = 0;
     for (const match of allMatches) {
+      const matchLabel = `${match.teams.home.name} vs ${match.teams.away.name}`;
       const matchDetails = await apiFootballService.getMatchById(match.fixture.id);
       
       if (matchDetails) {
         if (matchDetails.fixture.status.short === 'FT') {
-          const messageData = JSON.stringify({ match: matchDetails }); // Envoyer l'objet match complet
+          const messageData = JSON.stringify({ match: matchDetails });
           const dataBuffer = Buffer.from(messageData);
 
           try {
             await pubSubClient.topic(topicName).publishMessage({ data: dataBuffer });
             publishedCount++;
           } catch (error) {
-            console.error(chalk.red(`Erreur lors de la publication du message pour le match ${match.fixture.id}:`), error);
+            console.error(chalk.red(`Erreur lors de la publication du message pour le match ${matchLabel} (ID: ${match.fixture.id}):`), error);
           }
         } else {
-          console.log(chalk.yellow(`  -> Match ${match.fixture.id} ignoré car son statut est '${matchDetails.fixture.status.short}' (attendu: 'FT').`));
+          console.log(chalk.yellow(`  -> Match "${matchLabel}" (ID: ${match.fixture.id}) ignoré car son statut est '${matchDetails.fixture.status.short}' (attendu: 'FT').`));
         }
       } else {
-        console.log(chalk.red(`  -> Match ${match.fixture.id} non trouvé via l'API (après ${footballConfig.maxApiAttempts} tentatives). Ignoré.`));
+        console.log(chalk.red(`  -> Match "${matchLabel}" (ID: ${match.fixture.id}) non trouvé via l'API (après ${footballConfig.maxApiAttempts} tentatives). Ignoré.`));
       }
       // Pause pour respecter le rate limiting de l'API
       await sleep(200); 

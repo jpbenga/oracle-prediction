@@ -33,7 +33,7 @@ class ApiFootballService {
         if (axios.isAxiosError(error)) {
           if (error.response) {
             // L'API a répondu avec un code d'erreur (4xx, 5xx)
-            errorMessage = `Statut ${error.response.status} - ${JSON.stringify(error.response.data)}`;
+            errorMessage = `Statut ${error.response.status} - Réponse API: ${JSON.stringify(error.response.data, null, 2)}`;
           } else if (error.request) {
             // La requête a été faite mais aucune réponse n'a été reçue
             errorMessage = "Aucune réponse reçue de l'API (timeout probable)";
