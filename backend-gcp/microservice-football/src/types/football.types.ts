@@ -72,6 +72,15 @@ export interface Match {
     };
   }
 
+export interface TeamStats {
+  fixtures: { played: { total: number } };
+  goals: {
+    for: { average: { total: string | number } };
+    against: { average: { total: string | number } };
+  };
+  form: string;
+}
+
 export interface PredictionsData {
     [leagueName: string]: Prediction[];
 }

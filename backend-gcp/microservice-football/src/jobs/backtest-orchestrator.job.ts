@@ -45,32 +45,51 @@ export async function runBacktestOrchestrator() {
     }
 
     console.log(chalk.green(`${allMatches.length} matchs trouvés au total.`));
-    console.log(chalk.cyan('Récupération des détails complets pour chaque match et publication dans Pub/Sub...'));
+    console.log(chalk.cyan('Récupération des détails complets et des statistiques pour chaque match...'));
 
     let publishedCount = 0;
     for (const match of allMatches) {
       const matchLabel = `${match.teams.home.name} vs ${match.teams.away.name}`;
-      const matchDetails = await apiFootballService.getMatchById(match.fixture.id);
       
-      if (matchDetails) {
-        if (matchDetails.fixture.status.short === 'FT') {
-          const messageData = JSON.stringify({ match: matchDetails });
-          const dataBuffer = Buffer.from(messageData);
+      // Étape 1: Récupérer les détails du match
+      const matchDetails = await apiFootballService.getMatchById(match.fixture.id);
+      await sleep(200); // Pause après chaque appel
 
-          try {
-            await pubSubClient.topic(topicName).publishMessage({ data: dataBuffer });
-            publishedCount++;
-          } catch (error) {
-            console.error(chalk.red(`Erreur lors de la publication du message pour le match ${matchLabel} (ID: ${match.fixture.id}):`), error);
-          }
-        } else {
-          console.log(chalk.yellow(`  -> Match "${matchLabel}" (ID: ${match.fixture.id}) ignoré car son statut est '${matchDetails.fixture.status.short}' (attendu: 'FT').`));
-        }
-      } else {
+      if (!matchDetails) {
         console.log(chalk.red(`  -> Match "${matchLabel}" (ID: ${match.fixture.id}) non trouvé via l'API (après ${footballConfig.maxApiAttempts} tentatives). Ignoré.`));
+        continue;
       }
-      // Pause pour respecter le rate limiting de l'API
-      await sleep(200); 
+
+      if (matchDetails.fixture.status.short !== 'FT') {
+        console.log(chalk.yellow(`  -> Match "${matchLabel}" (ID: ${match.fixture.id}) ignoré car son statut est '${matchDetails.fixture.status.short}' (attendu: 'FT').`));
+        continue;
+      }
+
+      // Étape 2: Récupérer les statistiques des deux équipes
+      const [homeStats, awayStats] = await Promise.all([
+        apiFootballService.getTeamStats(match.teams.home.id, match.league.id, match.league.season),
+        apiFootballService.getTeamStats(match.teams.away.id, match.league.id, match.league.season)
+      ]);
+      await sleep(200); // Pause après chaque appel
+
+      if (!homeStats || !awayStats) {
+        console.log(chalk.red(`  -> Impossible de récupérer les statistiques pour le match "${matchLabel}" (ID: ${match.fixture.id}). Ignoré.`));
+        continue;
+      }
+
+      // Étape 3: Publier le message enrichi
+      const messageData = JSON.stringify({ 
+        match: matchDetails,
+        stats: { home: homeStats, away: awayStats }
+      });
+      const dataBuffer = Buffer.from(messageData);
+
+      try {
+        await pubSubClient.topic(topicName).publishMessage({ data: dataBuffer });
+        publishedCount++;
+      } catch (error) {
+        console.error(chalk.red(`Erreur lors de la publication du message pour le match ${matchLabel} (ID: ${match.fixture.id}):`), error);
+      }
     }
 
     console.log(chalk.green.bold(`

@@ -9,6 +9,7 @@ import { runTicketGenerator } from './jobs/ticket-generator.job';
 import { runResultsUpdater } from './jobs/results-updater.job';
 import { runBacktestOrchestrator } from './jobs/backtest-orchestrator.job';
 import { BacktestWorkerMessage, runBacktestWorker } from './jobs/backtest-worker.job';
+import { runPrediction } from './jobs/prediction.job';
 import { runBacktestSummarizer } from './jobs/backtest-summarizer.job';
 import { firestoreService } from './services/Firestore.service';
 
@@ -38,26 +39,35 @@ app.use(cors(corsOptions));
 const PORT = process.env.PORT || 8080;
 
 // ====================================================================
-// ENDPOINT POUR LE JOB SCHEDULER PRINCIPAL
+// ENDPOINT POUR LE JOB SCHEDULER PRINCIPAL (PIPELINE SÉQUENTIEL)
 // ====================================================================
-app.get('/run-all-jobs', async (req, res) => {
-  console.log(chalk.magenta.bold('--- Déclenchement de la séquence de jobs ---'));
+app.get('/run-daily-pipeline', async (req, res) => {
+  console.log(chalk.magenta.bold('--- Déclenchement du pipeline de jobs quotidien ---'));
   try {
-    // L'orchestrateur de backtest est rapide, il ne fait que publier des messages.
+    // ÉTAPE 1: Collecte des données de backtest et analyse de performance
+    console.log(chalk.blue.bold('\n[PIPELINE - ÉTAPE 1/4] Démarrage du Backtest...'));
     await runBacktestOrchestrator();
+    console.log(chalk.blue.bold('\n[PIPELINE - ÉTAPE 2/4] Démarrage de l\'analyse de performance (Summarizer)...'));
+    await runBacktestSummarizer();
 
-    // Les autres jobs sont également rapides et peuvent être lancés en parallèle.
-    await Promise.all([
-      runLeagueOrchestrator(),
-      runPredictionCompleter(),
-      runTicketGenerator(),
-      runResultsUpdater(),
-    ]);
+    // ÉTAPE 2: Génération des prédictions et des tickets pour le jour J
+    console.log(chalk.blue.bold('\n[PIPELINE - ÉTAPE 3/4] Démarrage de la génération des prédictions...'));
+    await runPrediction(); // Note: Assurez-vous que runPrediction est importé
+    console.log(chalk.blue.bold('\n[PIPELINE - ÉTAPE 4/4] Démarrage de la génération des tickets...'));
+    await runTicketGenerator();
 
-    res.status(202).send('La séquence de jobs a été démarrée avec succès. Les workers de backtest s\'exécuteront en arrière-plan.');
+    // ÉTAPE 3: Tâches de maintenance (mises à jour des résultats passés)
+    console.log(chalk.blue.bold('\n[PIPELINE - MAINTENANCE] Démarrage des mises à jour...'));
+    await runResultsUpdater();
+    await runPredictionCompleter();
+    await runLeagueOrchestrator();
+
+    console.log(chalk.magenta.bold('\n--- Pipeline de jobs quotidien terminé avec succès ---'));
+    res.status(200).send('Le pipeline de jobs quotidien a été exécuté avec succès.');
+
   } catch (error) {
-    console.error(chalk.red('Erreur lors du déclenchement des jobs :'), error);
-    res.status(500).send('Échec du démarrage des jobs.');
+    console.error(chalk.red('Erreur critique lors de l\'exécution du pipeline :'), error);
+    res.status(500).send('Échec de l\'exécution du pipeline.');
   }
 });
 
@@ -89,21 +99,6 @@ app.post('/pubsub-backtest-worker', async (req, res) => {
 });
 
 // ====================================================================
-// ENDPOINT POUR LE JOB SCHEDULER SECONDAIRE (RÉSUMÉ)
-// ====================================================================
-app.get('/run-backtest-summarizer', async (req, res) => {
-    console.log(chalk.magenta.bold('--- Déclenchement du job de résumé du backtest ---'));
-    try {
-        await runBacktestSummarizer();
-        res.status(200).send('Le résumé du backtest a été généré avec succès.');
-    } catch (error) {
-        console.error(chalk.red('Erreur lors de la génération du résumé du backtest :'), error);
-        res.status(500).send('Échec de la génération du résumé.');
-    }
-});
-
-
-// ====================================================================
 // ROUTES API POUR LE FRONT-END
 // ====================================================================
 app.get('/api/tickets', async (req, res) => {
@@ -113,10 +108,14 @@ app.get('/api/tickets', async (req, res) => {
         if (tickets.length > 0) {
             res.status(200).json(tickets);
         } else {
-            res.status(404).json({ message: "Aucun ticket trouvé pour cette date." });
+            res.status(404).json({
+                message: "Aucun ticket trouvé pour cette date."
+            });
         }
     } catch (error) {
-        res.status(500).json({ message: "Erreur du serveur." });
+        res.status(500).json({
+            message: "Erreur du serveur."
+        });
     }
 });
 
@@ -126,11 +125,16 @@ app.get('/api/predictions', async (req, res) => {
         const predictions = await firestoreService.getPredictionsForDate(date);
         if (predictions.length > 0) {
             res.status(200).json(predictions);
-        } else {
-            res.status(404).json({ message: "Aucune prédiction trouvée pour cette date." });
+        }
+        else {
+            res.status(404).json({
+                message: "Aucune prédiction trouvée pour cette date."
+            });
         }
     } catch (error) {
-        res.status(500).json({ message: "Erreur du serveur." });
+        res.status(500).json({
+            message: "Erreur du serveur."
+        });
     }
 });
 

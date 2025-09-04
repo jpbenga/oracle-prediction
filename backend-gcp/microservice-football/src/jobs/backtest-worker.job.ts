@@ -3,16 +3,17 @@
 import chalk from 'chalk';
 import { analyseMatchService } from '../services/AnalyseMatch.service';
 import { firestoreService } from '../services/Firestore.service';
-import { Match, BacktestResult } from '../types/football.types';
+import { Match, BacktestResult, TeamStats } from '../types/football.types';
 
 export interface BacktestWorkerMessage {
-  match: Match; // Le message contient maintenant l'objet Match complet
+  match: Match;
+  stats: { home: TeamStats | null, away: TeamStats | null };
 }
 
 /**
  * Détermine les résultats réels de tous les marchés possibles à partir des données d'un match terminé.
  * @param match - L'objet complet du match terminé.
- * @returns Un objet o�� les clés sont les marchés et les valeurs sont des booléens (vrai si le marché est gagnant).
+ * @returns Un objet où les clés sont les marchés et les valeurs sont des booléens (vrai si le marché est gagnant).
  */
 function determineActualMarketResults(match: Match): { [key: string]: boolean } | null {
     const { goals: finalScore, score } = match;
@@ -62,9 +63,9 @@ function determineActualMarketResults(match: Match): { [key: string]: boolean } 
 
 
 export async function runBacktestWorker(message: BacktestWorkerMessage) {
-  const { match } = message;
-  if (!match || !match.fixture || !match.fixture.id) {
-    console.error(chalk.red('Erreur : Données de match invalides ou manquantes dans le message.'));
+  const { match, stats } = message;
+  if (!match || !stats || !match.fixture || !match.fixture.id) {
+    console.error(chalk.red('Erreur : Données de match ou de statistiques invalides dans le message.'));
     return;
   }
   const matchId = match.fixture.id;
@@ -72,18 +73,12 @@ export async function runBacktestWorker(message: BacktestWorkerMessage) {
   console.log(chalk.blue(`--- [Worker] Démarrage de l'analyse pour le match ID: ${matchId} ---`));
 
   try {
-    // L'appel API a été supprimé, on utilise directement l'objet match.
     const matchDetails = match;
-    if (matchDetails.fixture.status.short !== 'FT') {
-      console.error(chalk.red(`[Worker] Match ${matchId} non terminé.`));
-      return;
-    }
-
     const matchLabel = `${matchDetails.teams.home.name} vs ${matchDetails.teams.away.name}`;
     console.log(chalk.cyan(`[Worker] Analyse de : ${matchLabel}`));
 
-    // 1. Obtenir les prédictions de confiance via le service centralisé
-    const analysisResult = await analyseMatchService.analyseMatch(matchDetails);
+    // 1. Obtenir les prédictions de confiance en utilisant les stats pré-chargées
+    const analysisResult = await analyseMatchService.analyseMatch(matchDetails, stats);
     if (!analysisResult || !analysisResult.markets) {
         console.log(chalk.yellow(`[Worker] -> L'analyse n'a produit aucun marché pour le match ${matchId}.`));
         return;
@@ -110,11 +105,9 @@ export async function runBacktestWorker(message: BacktestWorkerMessage) {
         const actualResult = actualResults[market];
 
         if (predictionScore !== undefined && actualResult !== undefined) {
-            // On enregistre TOUS les marchés, sans filtre de score, pour une analyse complète.
             backtestData.markets.push({
                 market: market,
                 prediction: predictionScore,
-                // Le résultat est "WON" si la prédiction (implicitement "vrai") correspond au résultat réel (qui est "vrai")
                 result: actualResult ? 'WON' : 'LOST',
             });
         }
@@ -133,3 +126,4 @@ export async function runBacktestWorker(message: BacktestWorkerMessage) {
     throw error;
   }
 }
+

@@ -2,18 +2,9 @@
 
 import chalk from 'chalk';
 import { apiFootballService } from './ApiFootball.service';
-import { Match } from '../types/football.types';
+import { Match, TeamStats } from '../types/football.types';
 
 // Définition des types directement dans le service pour la clarté
-interface TeamStats {
-  fixtures: { played: { total: number } };
-  goals: {
-    for: { average: { total: string | number } };
-    against: { average: { total: string | number } };
-  };
-  form: string; // La forme est souvent une chaîne comme "WLDLW"
-}
-
 interface Lambdas {
   home: number;
   away: number;
@@ -73,17 +64,27 @@ class AnalyseMatchService {
   /**
    * Analyse un match en profondeur pour générer des prédictions de confiance.
    * C'est le cœur du modèle prédictif.
+   * ACCEPTE DES STATS PRÉ-CHARGÉES POUR ÉVITER LES APPELS API INUTILES.
    */
-  public async analyseMatch(match: Match): Promise<{ markets: { [key: string]: number } } | null> {
+  public async analyseMatch(
+    match: Match,
+    preloadedStats?: { home: TeamStats | null, away: TeamStats | null }
+  ): Promise<{ markets: { [key: string]: number } } | null> {
     const { teams, league } = match;
     const season = league.season;
     const homeTeamId = teams.home.id;
     const awayTeamId = teams.away.id;
 
-    const [homeStats, awayStats]: [TeamStats | null, TeamStats | null] = await Promise.all([
-        apiFootballService.getTeamStats(homeTeamId, league.id, season),
-        apiFootballService.getTeamStats(awayTeamId, league.id, season)
-    ]);
+    let homeStats: TeamStats | null = preloadedStats?.home || null;
+    let awayStats: TeamStats | null = preloadedStats?.away || null;
+
+    // Si les stats ne sont pas fournies, on les récupère via l'API
+    if (!homeStats || !awayStats) {
+      [homeStats, awayStats] = await Promise.all([
+          apiFootballService.getTeamStats(homeTeamId, league.id, season),
+          apiFootballService.getTeamStats(awayTeamId, league.id, season)
+      ]);
+    }
 
     if (!homeStats || !awayStats || !homeStats.goals || !awayStats.goals) {
         console.log(chalk.red(`      -> Manque de statistiques pour le match ${teams.home.name} vs ${teams.away.name}.`));

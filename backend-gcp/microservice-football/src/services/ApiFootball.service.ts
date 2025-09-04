@@ -25,20 +25,26 @@ class ApiFootballService {
       attempts++;
       try {
         const response = await this.api.get(endpoint, { params });
+        
+        // GESTION DE L'ERREUR SILENCIEUSE
+        if (response.data && Array.isArray(response.data.response) && response.data.response.length === 0) {
+            console.log(chalk.yellow(`      -> Tentative API ${attempts}/${footballConfig.maxApiAttempts} (${endpoint}) échouée. Raison: L'API a répondu OK mais n'a retourné aucune donnée pour ces paramètres.`));
+            if (attempts < footballConfig.maxApiAttempts) await sleep(1500);
+            continue; // Passe à la tentative suivante
+        }
+
         if (response.data && response.data.response) {
           return response.data.response;
         }
+
       } catch (error: any) {
         let errorMessage = 'Erreur inconnue';
         if (axios.isAxiosError(error)) {
           if (error.response) {
-            // L'API a répondu avec un code d'erreur (4xx, 5xx)
             errorMessage = `Statut ${error.response.status} - Réponse API: ${JSON.stringify(error.response.data, null, 2)}`;
           } else if (error.request) {
-            // La requête a été faite mais aucune réponse n'a été reçue
             errorMessage = "Aucune réponse reçue de l'API (timeout probable)";
           } else {
-            // Une erreur s'est produite lors de la configuration de la requête
             errorMessage = error.message;
           }
         } else {
