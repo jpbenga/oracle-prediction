@@ -12,6 +12,8 @@ import { BacktestWorkerMessage, runBacktestWorker } from './jobs/backtest-worker
 import { runBacktestSummarizer } from './jobs/backtest-summarizer.job';
 import { firestoreService } from './services/Firestore.service';
 
+import { CorsOptions } from 'cors';
+
 const app = express();
 app.use(express.json());
 
@@ -21,7 +23,7 @@ const allowedOrigins = [
     process.env.CORS_ORIGIN || 'http://localhost:4200',
     'https://4200-firebase-oracle-prediction-1756797510260.cluster-64pjnskmlbaxowh5lzq6i7v4ra.cloudworkstations.dev'
 ];
-const corsOptions: cors.CorsOptions = {
+const corsOptions: CorsOptions = {
     origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
         if (!origin || allowedOrigins.indexOf(origin) !== -1) {
             callback(null, true);

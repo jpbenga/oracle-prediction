@@ -99,13 +99,17 @@ class FirestoreService {
   // ====================================================================
 
   public async saveBacktestResult(result: BacktestResult): Promise<string> {
-    const docRef = await this.db.collection('backtests').add(result);
+    const docRef = await this.db.collection('backtest_results').add(result);
     return docRef.id;
   }
 
   public async getAllBacktestResults(): Promise<BacktestResult[]> {
-    const snapshot = await this.db.collection('backtests').get();
-    return snapshot.docs.map(doc => doc.data() as BacktestResult);
+    const snapshot = await this.db.collection('backtest_results').get();
+    // On ne retourne que les documents qui ont un champ 'markets' de type tableau.
+    // Cela élimine les documents malformés ou d'un autre type.
+    return snapshot.docs
+        .map(doc => doc.data() as BacktestResult)
+        .filter(doc => doc && Array.isArray(doc.markets));
   }
 
   public async saveBacktestSummary(summary: BacktestBilan): Promise<void> {
