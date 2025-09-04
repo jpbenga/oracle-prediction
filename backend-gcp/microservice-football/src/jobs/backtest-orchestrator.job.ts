@@ -8,6 +8,7 @@ import { Match } from '../types/football.types';
 
 const pubSubClient = new PubSub();
 const topicName = 'backtest-jobs';
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export async function runBacktestOrchestrator() {
   console.log(chalk.blue('--- Démarrage du Backtest Orchestrator ---'));
@@ -44,22 +45,29 @@ export async function runBacktestOrchestrator() {
     }
 
     console.log(chalk.green(`${allMatches.length} matchs trouvés au total.`));
-    console.log(chalk.cyan('Publication des tâches de backtest dans Pub/Sub...'));
+    console.log(chalk.cyan('Récupération des détails complets pour chaque match et publication dans Pub/Sub...'));
 
     let publishedCount = 0;
-    const promises = allMatches.map(async (match) => {
-      const messageData = JSON.stringify({ matchId: match.fixture.id });
-      const dataBuffer = Buffer.from(messageData);
+    for (const match of allMatches) {
+      // L'orchestrateur récupère les détails complets du match
+      const matchDetails = await apiFootballService.getMatchById(match.fixture.id);
+      
+      if (matchDetails && matchDetails.fixture.status.short === 'FT') {
+        const messageData = JSON.stringify({ match: matchDetails }); // Envoyer l'objet match complet
+        const dataBuffer = Buffer.from(messageData);
 
-      try {
-        await pubSubClient.topic(topicName).publishMessage({ data: dataBuffer });
-        publishedCount++;
-      } catch (error) {
-        console.error(chalk.red(`Erreur lors de la publication du message pour le match ${match.fixture.id}:`), error);
+        try {
+          await pubSubClient.topic(topicName).publishMessage({ data: dataBuffer });
+          publishedCount++;
+        } catch (error) {
+          console.error(chalk.red(`Erreur lors de la publication du message pour le match ${match.fixture.id}:`), error);
+        }
+      } else {
+        console.log(chalk.yellow(`  -> Match ${match.fixture.id} ignoré (non trouvé ou non terminé).`));
       }
-    });
-
-    await Promise.all(promises);
+      // Pause pour respecter le rate limiting de l'API
+      await sleep(200); 
+    }
 
     console.log(chalk.green.bold(`
 SUCCÈS : ${publishedCount}/${allMatches.length} tâches de backtest ont été publiées dans le sujet "${topicName}".`));

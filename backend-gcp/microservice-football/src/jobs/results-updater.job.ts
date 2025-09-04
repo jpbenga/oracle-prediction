@@ -6,6 +6,8 @@ import { apiFootballService } from '../services/ApiFootball.service';
 // CORRECTION : Import des types nécessaires
 import { Match, PredictionDocument } from '../types/football.types';
 
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 export async function runResultsUpdater() {
     console.log(chalk.blue.bold("--- Démarrage du Job de Mise à Jour des Résultats ---"));
 
@@ -38,6 +40,8 @@ export async function runResultsUpdater() {
             } else {
                 console.log(chalk.yellow(`     -> Résultat non disponible ou match non terminé pour ${prediction.id}.`));
             }
+            // Ajout d'une pause pour respecter les limites de l'API
+            await sleep(500);
         }
     }
 

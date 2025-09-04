@@ -4,16 +4,15 @@ import chalk from 'chalk';
 import { analyseMatchService } from '../services/AnalyseMatch.service';
 import { firestoreService } from '../services/Firestore.service';
 import { Match, BacktestResult } from '../types/football.types';
-import { apiFootballService } from '../services/ApiFootball.service';
 
 export interface BacktestWorkerMessage {
-  matchId: number;
+  match: Match; // Le message contient maintenant l'objet Match complet
 }
 
 /**
  * Détermine les résultats réels de tous les marchés possibles à partir des données d'un match terminé.
  * @param match - L'objet complet du match terminé.
- * @returns Un objet où les clés sont les marchés et les valeurs sont des booléens (vrai si le marché est gagnant).
+ * @returns Un objet o�� les clés sont les marchés et les valeurs sont des booléens (vrai si le marché est gagnant).
  */
 function determineActualMarketResults(match: Match): { [key: string]: boolean } | null {
     const { goals: finalScore, score } = match;
@@ -63,18 +62,20 @@ function determineActualMarketResults(match: Match): { [key: string]: boolean } 
 
 
 export async function runBacktestWorker(message: BacktestWorkerMessage) {
-  const { matchId } = message;
-  if (!matchId) {
-    console.error(chalk.red('Erreur : ID de match manquant dans le message.'));
+  const { match } = message;
+  if (!match || !match.fixture || !match.fixture.id) {
+    console.error(chalk.red('Erreur : Données de match invalides ou manquantes dans le message.'));
     return;
   }
+  const matchId = match.fixture.id;
 
   console.log(chalk.blue(`--- [Worker] Démarrage de l'analyse pour le match ID: ${matchId} ---`));
 
   try {
-    const matchDetails = await apiFootballService.getMatchById(matchId);
-    if (!matchDetails || matchDetails.fixture.status.short !== 'FT') {
-      console.error(chalk.red(`[Worker] Match ${matchId} non trouvé ou non terminé.`));
+    // L'appel API a été supprimé, on utilise directement l'objet match.
+    const matchDetails = match;
+    if (matchDetails.fixture.status.short !== 'FT') {
+      console.error(chalk.red(`[Worker] Match ${matchId} non terminé.`));
       return;
     }
 
