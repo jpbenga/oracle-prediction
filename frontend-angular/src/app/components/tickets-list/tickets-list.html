@@ -1,5 +1,5 @@
 
-<div *ngIf="ticketsForSelectedDay">
+<div *ngIf="areTicketsAvailable; else noTickets">
   <div *ngIf="oraclesChoice" class="mb-8">
     <h2 class="text-2xl font-bold text-center mb-4 text-green-400">The Oracle's Choice</h2>
     <div class="max-w-md mx-auto">
@@ -14,6 +14,10 @@
     </div>
   </div>
 </div>
-<div *ngIf="!ticketsForSelectedDay">
-  <p class="text-center text-gray-500">No tickets available for this day.</p>
-</div>
+
+<ng-template #noTickets>
+  <app-empty-state
+    title="Aucun Ticket Trouvé"
+    message="Il n'y a aucun ticket généré pour ce jour. Veuillez consulter les pronostics ou essayer une autre date.">
+  </app-empty-state>
+</ng-template>

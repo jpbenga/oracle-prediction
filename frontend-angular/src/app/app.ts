@@ -1,12 +1,14 @@
 
 import { Component, signal } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
+import { CommonModule } from '@angular/common';
 import { Dashboard } from './dashboard/dashboard';
 import { ProfilePage } from './pages/profile-page/profile-page';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, Dashboard],
+  standalone: true,
+  imports: [CommonModule, RouterOutlet],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })

@@ -8,8 +8,9 @@ import { Paywall } from '../components/paywall/paywall';
 import { PredictionsList } from '../components/predictions-list/predictions-list';
 import { TicketsList } from '../components/tickets-list/tickets-list';
 import { ArchitectsSimulator } from '../components/architects-simulator/architects-simulator';
+import { EmptyStateComponent } from '../components/empty-state/empty-state.component';
 import { PredictionsApiResponse, TicketsApiResponse } from '../types/api-types';
-import { catchError } from 'rxjs/operators';
+import { catchError, tap } from 'rxjs/operators';
 import { of } from 'rxjs';
 
 @Component({
@@ -22,7 +23,8 @@ import { of } from 'rxjs';
     Paywall,
     PredictionsList,
     TicketsList,
-    ArchitectsSimulator
+    ArchitectsSimulator,
+    EmptyStateComponent
   ],
   templateUrl: './dashboard.html',
 })
@@ -30,7 +32,7 @@ export class Dashboard implements OnInit {
   predictionsData: PredictionsApiResponse = {};
   ticketsData: TicketsApiResponse = {};
   isLoading = true;
-  error: string | null = null;
+  error: { title: string, message: string } | null = null;
   selectedDayOffset = 0;
   isPremium = false;
   showPaywall = false;
@@ -52,7 +54,13 @@ export class Dashboard implements OnInit {
 
     this.apiService.getPredictions(date).pipe(
       catchError(err => {
-        if (err.status !== 404) { this.error = 'Erreur chargement prédictions.'; }
+        if (err.status !== 404) {
+          console.error("Erreur API (Prédictions):", err);
+          this.error = {
+            title: 'Anomalie dans la Matrice',
+            message: 'Le flux de données des prédictions a été corrompu. Impossible de contacter la Source.'
+          };
+        }
         return of({});
       })
     ).subscribe(data => {
@@ -61,20 +69,29 @@ export class Dashboard implements OnInit {
 
     this.apiService.getTickets(date).pipe(
       catchError(err => {
-        if (err.status !== 404) { this.error = 'Erreur chargement tickets.'; }
+        if (err.status !== 404) {
+          console.error("Erreur API (Tickets):", err);
+          if (!this.error) { // Display the first error that occurs
+            this.error = {
+              title: 'Signal Interrompu',
+              message: 'Impossible de matérialiser les tickets. Le signal vers le Mainframe est perdu.'
+            };
+          }
+        }
         return of({});
+      }),
+      tap(() => {
+        if (this.error) { // If an error occurred, stop loading
+          this.isLoading = false;
+        }
       })
     ).subscribe(data => {
       this.ticketsData = data;
-      this.isLoading = false;
+      this.isLoading = false; // Also stop loading on success
     });
   }
   
   handleDaySelect(offset: number): void {
-    if (!this.isPremium && offset > 0) {
-      this.showPaywall = true;
-      return;
-    }
     this.selectedDayOffset = offset;
     const date = this.getDateFromOffset(offset);
     this.loadDataForDate(date);

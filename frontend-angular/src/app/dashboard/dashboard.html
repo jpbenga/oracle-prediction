@@ -8,9 +8,15 @@
     <p class="text-lg">Chargement des données...</p>
   </div>
 
-  <div *ngIf="!isLoading && error" class="text-center mt-8 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
-    <strong class="font-bold">Une erreur est survenue :</strong>
-    <span class="block sm:inline">{{ error }}</span>
+  <div *ngIf="error" class="w-full bg-[#0A0A0A] border border-[#FF0000] rounded-lg p-8 text-center flex flex-col items-center font-mono mt-8">
+    <!-- AlertTriangleIcon SVG -->
+    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-[#FF0000] mb-4">
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+      <line x1="12" y1="9" x2="12" y2="13"></line>
+      <line x1="12" y1="17" x2="12.01" y2="17"></line>
+    </svg>
+    <h3 class="text-2xl font-bold text-[#FF0000] mb-2">{{ error.title }}</h3>
+    <p class="text-[#E0E0E0] max-w-md mx-auto">{{ error.message }}</p>
   </div>
 
   <div *ngIf="!isLoading && !error">
@@ -20,9 +26,10 @@
         <app-tickets-list [ticketsData]="ticketsData"></app-tickets-list>
       </div>
       <ng-template #noTickets>
-        <div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4" role="alert">
-          <p>Aucun ticket n'a été généré pour cette date.</p>
-        </div>
+        <app-empty-state
+          title="Aucun Ticket Trouvé"
+          message="Aucun ticket n'a été généré pour cette date. Le silence de la Matrice est parfois un présage.">
+        </app-empty-state>
       </ng-template>
     </div>
 
@@ -32,9 +39,10 @@
         <app-predictions-list [allPredictions]="predictionsData"></app-predictions-list>
       </div>
       <ng-template #noPredictions>
-        <div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 mt-4" role="alert">
-          <p>Aucune prédiction disponible pour cette date. C'est peut-être la trêve !</p>
-        </div>
+        <app-empty-state
+          title="Transmission Interrompue"
+          message="Aucune prédiction n'a été interceptée pour cette date. C'est peut-être la trêve, ou une anomalie.">
+        </app-empty-state>
       </ng-template>
     </div>
     
