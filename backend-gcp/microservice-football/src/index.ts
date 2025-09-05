@@ -1,8 +1,6 @@
-// backend-gcp/microservice-football/src/index.ts
-
 import express from 'express';
 import chalk from 'chalk';
-import cors from 'cors'; // Ajout de l'import pour CORS
+import cors, { CorsOptions } from 'cors';
 import { runLeagueOrchestrator } from './jobs/league-orchestrator.job';
 import { runPredictionCompleter } from './jobs/prediction-completer.job';
 import { runTicketGenerator } from './jobs/ticket-generator.job';
@@ -13,17 +11,16 @@ import { runPrediction } from './jobs/prediction.job';
 import { runBacktestSummarizer } from './jobs/backtest-summarizer.job';
 import { firestoreService } from './services/Firestore.service';
 
-import { CorsOptions } from 'cors';
-
 const app = express();
 app.use(express.json());
 
 // --- Configuration CORS ---
-// ... (votre configuration CORS reste la même)
 const allowedOrigins = [
+    'https://oracle-prediction-app.web.app', // <-- LA CORRECTION EST ICI
     process.env.CORS_ORIGIN || 'http://localhost:4200',
     'https://4200-firebase-oracle-prediction-1756797510260.cluster-64pjnskmlbaxowh5lzq6i7v4ra.cloudworkstations.dev'
 ];
+
 const corsOptions: CorsOptions = {
     origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
         if (!origin || allowedOrigins.indexOf(origin) !== -1) {
