@@ -2,7 +2,7 @@
 swagger: '2.0'
 info:
   title: 'Oracle Prediction API (CORS Fixed)'
-  version: '2.0.1'
+  version: '2.0.2' # Version incrémentée pour refléter la nouvelle correction
 schemes:
   - https
 produces:
@@ -26,6 +26,7 @@ paths:
         - firebase: []
       x-google-backend:
         address: https://oracle-prediction-football-321557095918.europe-west1.run.app
+        path_translation: APPEND_PATH_TO_ADDRESS # <-- CORRECTION APPLIQUÉE
       responses:
         '200':
           description: "Success"
@@ -56,6 +57,7 @@ paths:
         - firebase: []
       x-google-backend:
         address: https://oracle-prediction-football-321557095918.europe-west1.run.app
+        path_translation: APPEND_PATH_TO_ADDRESS # <-- CORRECTION APPLIQUÉE
       responses:
         '200':
           description: "Success"
@@ -86,6 +88,7 @@ paths:
         - firebase: []
       x-google-backend:
         address: https://oracle-prediction-football-321557095918.europe-west1.run.app
+        path_translation: APPEND_PATH_TO_ADDRESS # <-- CORRECTION APPLIQUÉE
       responses:
         '202':
           description: "Jobs started"
