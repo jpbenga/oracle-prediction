@@ -23,14 +23,7 @@ const allowedOrigins = [
 ];
 
 const corsOptions: CorsOptions = {
-    origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
-        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-            callback(null, true);
-        } else {
-            console.warn(chalk.yellow(`CORS: Origine refusée: ${origin}`));
-            callback(new Error(`Not allowed by CORS: ${origin}`), false);
-        }
-    },
+    origin: allowedOrigins,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
     credentials: true,
@@ -44,12 +37,6 @@ app.use(cors(corsOptions));
 app.use((req, res, next) => {
     console.log(chalk.cyan(`${req.method} ${req.path} - Origin: ${req.headers.origin || 'none'}`));
     next();
-});
-
-// Route explicite pour gérer les requêtes OPTIONS sur /api/tickets
-app.options('/api/tickets', (req, res) => {
-    console.log(chalk.green('Gestion de la requête OPTIONS pour /api/tickets'));
-    res.status(200).send(); // Le middleware cors ajoute les en-têtes nécessaires
 });
 
 const PORT = process.env.PORT || 8080;
