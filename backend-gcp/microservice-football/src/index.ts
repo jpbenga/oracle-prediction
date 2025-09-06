@@ -1,3 +1,5 @@
+// --- Fichier: backend-gcp/microservice-football/src/index.ts ---
+
 import express from 'express';
 import chalk from 'chalk';
 import cors, { CorsOptions } from 'cors';
@@ -24,6 +26,7 @@ const allowedOrigins = [
 
 const corsOptions: CorsOptions = {
     origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
+        // Permettre les requêtes sans origine pour les outils comme Postman
         if (!origin || allowedOrigins.indexOf(origin) !== -1) {
             callback(null, true);
         } else {
@@ -34,85 +37,80 @@ const corsOptions: CorsOptions = {
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
     credentials: true,
-    optionsSuccessStatus: 200
+    optionsSuccessStatus: 200 // Pour la compatibilité avec les anciens navigateurs
 };
 
-// Appliquer CORS avant toutes les routes. C'est LUI qui gère les requêtes OPTIONS.
+// Appliquer CORS avant toutes les routes. C'est ce middleware qui gère les requêtes OPTIONS (preflight).
 app.use(cors(corsOptions));
 
-
-// --- LE RESTE DE VOTRE FICHIER EST PARFAIT ---
+// Middleware pour logger les requêtes entrantes
+app.use((req, res, next) => {
+    console.log(chalk.cyan(`${req.method} ${req.path} - Origin: ${req.headers.origin || 'none'}`));
+    next();
+});
 
 const PORT = process.env.PORT || 8080;
 
-// ... (toutes vos routes GET, POST, etc. restent inchangées) ...
+// ====================================================================
+// ENDPOINTS
+// ====================================================================
 
-// ====================================================================
-// ENDPOINT POUR LE JOB SCHEDULER PRINCIPAL (PIPELINE SÉQUENTIEL)
-// ====================================================================
+// --- ENDPOINT POUR LE JOB SCHEDULER PRINCIPAL ---
 app.get('/run-daily-pipeline', async (req, res) => {
-    console.log(chalk.magenta.bold('--- Déclenchement du pipeline de jobs quotidien ---'));
-    
-    // Réponse immédiate pour ne pas faire attendre le client
-    res.status(202).send('Le pipeline de jobs quotidien a été démarré.');
+  console.log(chalk.magenta.bold('--- Déclenchement du pipeline de jobs quotidien ---'));
+ 
+  res.status(202).json({
+    message: 'Pipeline démarré avec succès',
+    timestamp: new Date().toISOString()
+  });
 
-    try {
-        // Exécution en arrière-plan
-        console.log(chalk.blue.bold('\n[PIPELINE - ÉTAPE 1/4] Démarrage du Backtest...'));
-        await runBacktestOrchestrator();
-        console.log(chalk.blue.bold('\n[PIPELINE - ÉTAPE 2/4] Démarrage de l\'analyse de performance (Summarizer)...'));
-        await runBacktestSummarizer();
-        console.log(chalk.blue.bold('\n[PIPELINE - ÉTAPE 3/4] Démarrage de la génération des prédictions...'));
-        await runPrediction();
-        console.log(chalk.blue.bold('\n[PIPELINE - ÉTAPE 4/4] Démarrage de la génération des tickets...'));
-        await runTicketGenerator();
-        console.log(chalk.blue.bold('\n[PIPELINE - MAINTENANCE] Démarrage des mises à jour...'));
-        await runResultsUpdater();
-        await runPredictionCompleter();
-        await runLeagueOrchestrator();
-        console.log(chalk.magenta.bold('\n--- Pipeline de jobs quotidien terminé avec succès ---'));
-    } catch (error) {
-        console.error(chalk.red('Erreur critique lors de l\'exécution du pipeline :'), error);
-    }
+  try {
+    // Le reste du pipeline s'exécute en arrière-plan
+    await runBacktestOrchestrator();
+    await runBacktestSummarizer();
+    await runPrediction();
+    await runTicketGenerator();
+    await runResultsUpdater();
+    await runPredictionCompleter();
+    await runLeagueOrchestrator();
+    console.log(chalk.magenta.bold('\n--- Pipeline de jobs quotidien terminé avec succès ---'));
+  } catch (error) {
+    console.error(chalk.red('Erreur critique lors de l\'exécution du pipeline :'), error);
+  }
 });
 
-
-// ====================================================================
-// ENDPOINT POUR LE WORKER (DÉCLENCHÉ PAR PUB/SUB)
-// ====================================================================
+// --- ENDPOINT POUR LE WORKER PUB/SUB ---
 app.post('/pubsub-backtest-worker', async (req, res) => {
   if (!req.body || !req.body.message) {
-    const errorMessage = 'Requête invalide : corps ou message manquant.';
-    console.error(chalk.red(errorMessage));
-    return res.status(400).send(errorMessage);
+    return res.status(400).json({ error: 'Requête invalide : corps ou message manquant.' });
   }
 
   try {
     const messageData = Buffer.from(req.body.message.data, 'base64').toString('utf-8');
     const messagePayload = JSON.parse(messageData) as BacktestWorkerMessage;
-    runBacktestWorker(messagePayload); 
-    res.status(204).send(); 
+    runBacktestWorker(messagePayload);
+    res.status(204).send();
   } catch (error) {
     console.error(chalk.red('Erreur dans le worker Pub/Sub :'), error);
-    res.status(500).send('Échec du traitement du message.');
+    res.status(500).json({ error: 'Échec du traitement du message.' });
   }
 });
 
-// ====================================================================
-// ROUTES API POUR LE FRONT-END
-// ====================================================================
+// --- ROUTES API POUR LE FRONT-END ---
 app.get('/api/tickets', async (req, res) => {
     try {
         const date = typeof req.query.date === 'string' ? req.query.date : new Date().toISOString().split('T')[0];
         const tickets = await firestoreService.getTicketsForDate(date);
+        
         if (tickets.length > 0) {
-            res.status(200).json(tickets);
+            res.status(200).json({ success: true, data: tickets });
         } else {
-            res.status(404).json({ message: "Aucun ticket trouvé pour cette date." });
+            res.status(404).json({ success: false, message: `Aucun ticket trouvé pour la date ${date}` });
         }
     } catch (error) {
         console.error(chalk.red('Erreur /api/tickets:'), error);
-        res.status(500).json({ message: "Erreur du serveur." });
+        const errorMessage = error instanceof Error ? error.message : 'Une erreur est survenue';
+        res.status(500).json({ success: false, message: "Erreur interne du serveur", error: errorMessage });
     }
 });
 
@@ -120,21 +118,33 @@ app.get('/api/predictions', async (req, res) => {
     try {
         const date = typeof req.query.date === 'string' ? req.query.date : new Date().toISOString().split('T')[0];
         const predictions = await firestoreService.getPredictionsForDate(date);
+        
         if (predictions.length > 0) {
-            res.status(200).json(predictions);
-        }
-        else {
-            res.status(404).json({ message: "Aucune prédiction trouvée pour cette date." });
+            res.status(200).json({ success: true, data: predictions });
+        } else {
+            res.status(404).json({ success: false, message: `Aucune prédiction trouvée pour la date ${date}` });
         }
     } catch (error) {
         console.error(chalk.red('Erreur /api/predictions:'), error);
-        res.status(500).json({ message: "Erreur du serveur." });
+        const errorMessage = error instanceof Error ? error.message : 'Une erreur est survenue';
+        res.status(500).json({ success: false, message: "Erreur interne du serveur", error: errorMessage });
     }
 });
 
 
+// --- GESTION DES ERREURS ET DÉMARRAGE ---
+
+// Route de santé
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
+});
+
+// Gestionnaire 404
+app.use('*', (req, res) => {
+    res.status(404).json({ success: false, message: `Route non trouvée: ${req.method} ${req.path}` });
+});
+
 app.listen(PORT, () => {
-  console.log(
-    chalk.green.bold(`🚀 Le microservice est démarré et écoute sur le port ${PORT}`)
-  );
+  console.log(chalk.green.bold(`🚀 Le microservice est démarré et écoute sur le port ${PORT}`));
+  console.log(chalk.cyan(`🌍 Origines CORS autorisées: ${allowedOrigins.join(', ')}`));
 });

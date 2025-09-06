@@ -1,8 +1,10 @@
-# swagger.yaml - Stratégie de transmission des requêtes OPTIONS
+# --- Fichier: backend-gcp/swagger.yaml ---
+
+# Stratégie de transmission ("passthrough")
 swagger: '2.0'
 info:
-  title: 'Oracle Prediction API (Passthrough Fix)'
-  version: '6.0.0'
+  title: 'Oracle Prediction API (Passthrough Strategy)'
+  version: '8.0.0' # Version majeure pour marquer le changement de stratégie
 schemes:
   - https
 produces:
@@ -18,25 +20,10 @@ securityDefinitions:
     x-google-audiences: "oracle-prediction-app"
 
 paths:
-  # On utilise un "wildcard" pour dire que TOUS les chemins sont gérés par le backend
+  # Règle "joker" pour capturer toutes les URL (ex: /api/tickets, /health, etc.)
   /{proxy+}:
-    get:
-      summary: "Proxy GET requests"
-      operationId: "proxy-get"
-      security:
-        - firebase: []
-      x-google-backend:
-        address: https://oracle-prediction-football-321557095918.europe-west1.run.app
-        path_translation: APPEND_PATH_TO_ADDRESS
-      responses:
-        '200':
-          description: "A successful response from the backend"
-        '404':
-          description: "Not found response from the backend"
-        '500':
-          description: "Server error from the backend"
-    
-    # On transmet aussi TOUTES les requêtes OPTIONS au backend, sans sécurité
+    # La méthode OPTIONS est spéciale: on la transmet au backend SANS appliquer de sécurité.
+    # C'est la clé de la résolution du problème.
     options:
       summary: "CORS preflight"
       operationId: "cors-preflight"
@@ -44,5 +31,30 @@ paths:
         address: https://oracle-prediction-football-321557095918.europe-west1.run.app
         path_translation: APPEND_PATH_TO_ADDRESS
       responses:
+        # La réponse sera générée par le backend, la Gateway n'a qu'à la transmettre.
         '200':
           description: "CORS preflight response"
+
+    # Pour toutes les autres méthodes (GET, POST...), on applique la sécurité.
+    # Le 'x-google-backend' est défini au niveau du chemin et s'applique à toutes les méthodes.
+    x-google-backend:
+      address: https://oracle-prediction-football-321557095918.europe-west1.run.app
+      path_translation: APPEND_PATH_TO_ADDRESS
+
+    get:
+      security:
+        - firebase: []
+      responses:
+        '200':
+          description: "OK"
+        'default':
+          description: "Default response"
+          
+    # Ajoutez d'autres méthodes (post, put, etc.) ici si vous en avez besoin,
+    # toujours en appliquant la sécurité.
+    # post:
+    #   security:
+    #     - firebase: []
+    #   responses:
+    #     '200':
+    #       description: "OK"
