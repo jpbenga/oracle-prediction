@@ -17,19 +17,33 @@ securityDefinitions:
     x-google-audiences: "oracle-prediction-app"
 
 paths:
+  /health:
+    get:
+      summary: "Health check"
+      operationId: "health-check"
+      security: []
+      x-google-backend:
+        address: https://oracle-prediction-football-321557095918.europe-west1.run.app
+        path_translation: APPEND_PATH_TO_ADDRESS
+      responses:
+        '200':
+          description: "Health check response"
   # Règle "catch-all" pour transférer TOUTES les requêtes au backend
   /{proxy+}:
-    # Définition du backend pour toutes les méthodes de ce chemin
-    x-google-backend:
-      address: https://oracle-prediction-football-321557095918.europe-west1.run.app
-      path_translation: APPEND_PATH_TO_ADDRESS
-
     # AJOUT IMPORTANT : Autoriser les requêtes preflight OPTIONS à passer
     options:
       summary: "CORS preflight passthrough"
       operationId: "cors-preflight-passthrough-all"
       # Les requêtes OPTIONS n'ont pas de sécurité, c'est crucial
       security: []
+      parameters:
+        - name: proxy+
+          in: path
+          required: true
+          type: string
+      x-google-backend:
+        address: https://oracle-prediction-football-321557095918.europe-west1.run.app
+        path_translation: APPEND_PATH_TO_ADDRESS
       responses:
         '204':
           description: "No Content. CORS preflight response."
@@ -40,6 +54,14 @@ paths:
       operationId: "get-passthrough"
       security:
         - firebase: []
+      parameters:
+        - name: proxy+
+          in: path
+          required: true
+          type: string
+      x-google-backend:
+        address: https://oracle-prediction-football-321557095918.europe-west1.run.app
+        path_translation: APPEND_PATH_TO_ADDRESS
       responses:
         'default':
           description: "Default GET response from backend"
