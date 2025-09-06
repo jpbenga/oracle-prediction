@@ -1,8 +1,8 @@
 # swagger.yaml - Stratégie de transmission des requêtes OPTIONS
 swagger: '2.0'
 info:
-  title: 'Oracle Prediction API (CORS Passthrough Fix)'
-  version: '4.0.0'
+  title: 'Oracle Prediction API (Passthrough Fix)'
+  version: '6.0.0'
 schemes:
   - https
 produces:
@@ -18,10 +18,11 @@ securityDefinitions:
     x-google-audiences: "oracle-prediction-app"
 
 paths:
-  /api/tickets:
+  # On utilise un "wildcard" pour dire que TOUS les chemins sont gérés par le backend
+  /{proxy+}:
     get:
-      summary: "Get tickets"
-      operationId: "getTickets"
+      summary: "Proxy GET requests"
+      operationId: "proxy-get"
       security:
         - firebase: []
       x-google-backend:
@@ -29,57 +30,19 @@ paths:
         path_translation: APPEND_PATH_TO_ADDRESS
       responses:
         '200':
-          description: "Success"
+          description: "A successful response from the backend"
+        '404':
+          description: "Not found response from the backend"
+        '500':
+          description: "Server error from the backend"
+    
+    # On transmet aussi TOUTES les requêtes OPTIONS au backend, sans sécurité
     options:
-      summary: "CORS support for tickets"
-      operationId: "corsTickets"
-      x-google-backend: # <-- MODIFICATION CLÉ
-        address: https://oracle-prediction-football-321557095918.europe-west1.run.app
-        path_translation: APPEND_PATH_TO_ADDRESS
-      responses:
-        '204':
-          description: "No Content response for CORS preflight."
-
-  /api/predictions:
-    get:
-      summary: "Get predictions"
-      operationId: "getPredictions"
-      security:
-        - firebase: []
+      summary: "CORS preflight"
+      operationId: "cors-preflight"
       x-google-backend:
         address: https://oracle-prediction-football-321557095918.europe-west1.run.app
         path_translation: APPEND_PATH_TO_ADDRESS
       responses:
         '200':
-          description: "Success"
-    options:
-      summary: "CORS support for predictions"
-      operationId: "corsPredictions"
-      x-google-backend: # <-- MODIFICATION CLÉ
-        address: https://oracle-prediction-football-321557095918.europe-west1.run.app
-        path_translation: APPEND_PATH_TO_ADDRESS
-      responses:
-        '204':
-          description: "No Content response for CORS preflight."
-
-  /run-all-jobs:
-    get:
-      summary: "Run all jobs"
-      operationId: "runAllJobs"
-      security:
-        - firebase: []
-      x-google-backend:
-        address: https://oracle-prediction-football-321557095918.europe-west1.run.app
-        path_translation: APPEND_PATH_TO_ADDRESS
-      responses:
-        '202':
-          description: "Jobs started"
-    options:
-      summary: "CORS support for jobs endpoint"
-      operationId: "corsJobs"
-      x-google-backend: # <-- MODIFICATION CLÉ
-        address: https://oracle-prediction-football-321557095918.europe-west1.run.app
-        path_translation: APPEND_PATH_TO_ADDRESS
-      responses:
-        '204':
-          description: "No Content response for CORS preflight."
+          description: "CORS preflight response"
