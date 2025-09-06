@@ -1,10 +1,8 @@
-# --- Fichier: backend-gcp/swagger.yaml ---
-
-# Stratégie de transmission ("passthrough")
+# swagger.yaml - Stratégie de transmission ("passthrough")
 swagger: '2.0'
 info:
   title: 'Oracle Prediction API (Passthrough Strategy)'
-  version: '8.0.0' # Version majeure pour marquer le changement de stratégie
+  version: '10.0.0' # Version majeure pour marquer la nouvelle stratégie
 schemes:
   - https
 produces:
@@ -20,41 +18,31 @@ securityDefinitions:
     x-google-audiences: "oracle-prediction-app"
 
 paths:
-  # Règle "joker" pour capturer toutes les URL (ex: /api/tickets, /health, etc.)
+  # Règle "joker" pour capturer toutes les URLs (ex: /api/tickets, /health)
   /{proxy+}:
     # La méthode OPTIONS est spéciale: on la transmet au backend SANS appliquer de sécurité.
-    # C'est la clé de la résolution du problème.
+    # C'est la clé de la résolution du problème 404.
     options:
-      summary: "CORS preflight"
-      operationId: "cors-preflight"
+      summary: "CORS preflight passthrough"
+      operationId: "cors-preflight-passthrough"
       x-google-backend:
         address: https://oracle-prediction-football-321557095918.europe-west1.run.app
         path_translation: APPEND_PATH_TO_ADDRESS
       responses:
-        # La réponse sera générée par le backend, la Gateway n'a qu'à la transmettre.
-        '200':
-          description: "CORS preflight response"
+        # La réponse (200 OK) sera générée par le backend, la Gateway n'a qu'à la transmettre.
+        'default':
+          description: "CORS preflight response from backend"
 
-    # Pour toutes les autres méthodes (GET, POST...), on applique la sécurité.
-    # Le 'x-google-backend' est défini au niveau du chemin et s'applique à toutes les méthodes.
-    x-google-backend:
-      address: https://oracle-prediction-football-321557095918.europe-west1.run.app
-      path_translation: APPEND_PATH_TO_ADDRESS
-
+    # Pour toutes les autres méthodes (GET, POST...), on applique la sécurité Firebase.
     get:
+      summary: "Generic GET with security"
+      operationId: "get-passthrough"
       security:
         - firebase: []
+      x-google-backend:
+        address: https://oracle-prediction-football-321557095918.europe-west1.run.app
+        path_translation: APPEND_PATH_TO_ADDRESS
       responses:
-        '200':
-          description: "OK"
         'default':
-          description: "Default response"
-          
-    # Ajoutez d'autres méthodes (post, put, etc.) ici si vous en avez besoin,
-    # toujours en appliquant la sécurité.
-    # post:
-    #   security:
-    #     - firebase: []
-    #   responses:
-    #     '200':
-    #       description: "OK"
+          description: "Default GET response from backend"
+

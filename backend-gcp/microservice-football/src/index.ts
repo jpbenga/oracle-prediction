@@ -144,4 +144,3 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 app.listen(PORT, () => {
   console.log(chalk.green.bold(`🚀 Le microservice est démarré et écoute sur le port ${PORT}`));
 });
-
