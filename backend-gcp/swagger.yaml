@@ -1,7 +1,7 @@
 swagger: '2.0'
 info:
   title: 'Oracle Prediction API (Passthrough Strategy)'
-  version: '10.0.1' # Mise à jour de la version pour refléter les changements
+  version: '10.0.1'
 schemes:
   - https
 produces:
@@ -17,59 +17,30 @@ securityDefinitions:
     x-google-audiences: "oracle-prediction-app"
 
 paths:
-  /api/tickets:
-    options:
-      summary: "CORS preflight for /api/tickets"
-      operationId: "cors-preflight-tickets"
-      x-google-backend:
-        address: https://oracle-prediction-football-321557095918.europe-west1.run.app
-        path_translation: APPEND_PATH_TO_ADDRESS
-      responses:
-        '200':
-          description: "CORS preflight response"
-          headers:
-            Access-Control-Allow-Origin:
-              type: string
-            Access-Control-Allow-Methods:
-              type: string
-            Access-Control-Allow-Headers:
-              type: string
-    get:
-      summary: "Get tickets"
-      operationId: "get-tickets"
-      security:
-        - firebase: []
-      x-google-backend:
-        address: https://oracle-prediction-football-321557095918.europe-west1.run.app
-        path_translation: APPEND_PATH_TO_ADDRESS
-      parameters:
-        - in: query
-          name: date
-          type: string
-          required: false
-      responses:
-        '200':
-          description: "Successful response"
-          schema:
-            type: object
+  # Règle "catch-all" pour transférer TOUTES les requêtes au backend
   /{proxy+}:
+    # Définition du backend pour toutes les méthodes de ce chemin
+    x-google-backend:
+      address: https://oracle-prediction-football-321557095918.europe-west1.run.app
+      path_translation: APPEND_PATH_TO_ADDRESS
+
+    # AJOUT IMPORTANT : Autoriser les requêtes preflight OPTIONS à passer
     options:
       summary: "CORS preflight passthrough"
-      operationId: "cors-preflight-passthrough"
-      x-google-backend:
-        address: https://oracle-prediction-football-321557095918.europe-west1.run.app
-        path_translation: APPEND_PATH_TO_ADDRESS
+      operationId: "cors-preflight-passthrough-all"
+      # Les requêtes OPTIONS n'ont pas de sécurité, c'est crucial
+      security: []
       responses:
-        'default':
-          description: "CORS preflight response from backend"
+        '204':
+          description: "No Content. CORS preflight response."
+
+    # Vos autres méthodes (GET, POST, etc.) restent inchangées
     get:
       summary: "Generic GET with security"
       operationId: "get-passthrough"
       security:
         - firebase: []
-      x-google-backend:
-        address: https://oracle-prediction-football-321557095918.europe-west1.run.app
-        path_translation: APPEND_PATH_TO_ADDRESS
       responses:
         'default':
           description: "Default GET response from backend"
+    # Ajoutez ici d'autres méthodes (post, put, delete...) si nécessaire
