@@ -23,11 +23,25 @@ paths:
       operationId: "health-check"
       security: []
       x-google-backend:
-        address: https://oracle-prediction-football-321557095918.europe-west1.run.app
+        address: https://oracle-prediction-football-co4b4rv5mq-ew.a.run.app
         path_translation: APPEND_PATH_TO_ADDRESS
       responses:
         '200':
           description: "Health check response"
+  /run-daily-pipeline:
+    get:
+      summary: "Run Daily Pipeline"
+      operationId: "run-daily-pipeline"
+      security:
+        - firebase: []
+      x-google-backend:
+        address: https://oracle-prediction-football-co4b4rv5mq-ew.a.run.app
+        path_translation: APPEND_PATH_TO_ADDRESS
+      responses:
+        '202':
+          description: "Pipeline started"
+        'default':
+          description: "Default response from backend"
   # Règle "catch-all" pour transférer TOUTES les requêtes au backend
   /{proxy+}:
     # AJOUT IMPORTANT : Autoriser les requêtes preflight OPTIONS à passer
@@ -42,7 +56,7 @@ paths:
           required: true
           type: string
       x-google-backend:
-        address: https://oracle-prediction-football-321557095918.europe-west1.run.app
+        address: https://oracle-prediction-football-co4b4rv5mq-ew.a.run.app
         path_translation: APPEND_PATH_TO_ADDRESS
       responses:
         '204':
@@ -60,7 +74,7 @@ paths:
           required: true
           type: string
       x-google-backend:
-        address: https://oracle-prediction-football-321557095918.europe-west1.run.app
+        address: https://oracle-prediction-football-co4b4rv5mq-ew.a.run.app
         path_translation: APPEND_PATH_TO_ADDRESS
       responses:
         'default':
