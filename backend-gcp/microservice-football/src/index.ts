@@ -11,6 +11,8 @@ import { runPrediction } from './jobs/prediction.job';
 import { runBacktestSummarizer } from './jobs/backtest-summarizer.job';
 import { firestoreService } from './services/Firestore.service';
 
+console.log(chalk.blue.bold('--- Démarrage du fichier index.ts ---'));
+
 const app = express();
 app.use(express.json());
 
@@ -33,11 +35,19 @@ const corsOptions: CorsOptions = {
 // Appliquer le middleware CORS en premier
 app.use(cors(corsOptions));
 
-// Journalisation des requêtes
+// Journalisation détaillée des requêtes
 app.use((req, res, next) => {
-    console.log(chalk.cyan(`${req.method} ${req.path} - Origin: ${req.headers.origin || 'none'}`));
+    console.log(chalk.cyan.bold('\n--- NOUVELLE REQUÊTE ---'));
+    console.log(chalk.cyan(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`));
+    console.log(chalk.cyan('Origin:'), req.headers.origin || 'none');
+    console.log(chalk.cyan('Headers:'), JSON.stringify(req.headers, null, 2));
+    if (req.body && Object.keys(req.body).length > 0) {
+        console.log(chalk.cyan('Body:'), JSON.stringify(req.body, null, 2));
+    }
+    console.log(chalk.cyan.bold('\n--- FIN DE LA REQUÊTE ---\n'));
     next();
 });
+
 
 const PORT = process.env.PORT || 8080;
 
@@ -109,6 +119,7 @@ app.get('/api/predictions', async (req, res) => {
 });
 
 app.get('/health', (req, res) => {
+    console.log(chalk.green('--- Réponse du Health Check ---'));
     res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
@@ -117,7 +128,8 @@ app.get('/health', (req, res) => {
 // ====================================================================
 
 app.use((req, res, next) => {
-    console.log(chalk.yellow(`Route non trouvée: ${req.method} ${req.path}`));
+    console.log(chalk.yellow.bold(`--- ROUTE NON TROUVÉE ---`));
+    console.log(chalk.yellow(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`));
     res.status(404).json({
         success: false,
         message: `Route non trouvée: ${req.method} ${req.path}`
@@ -125,7 +137,7 @@ app.use((req, res, next) => {
 });
 
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-    console.error(chalk.red('Erreur non gérée:'), err);
+    console.error(chalk.red.bold('--- ERREUR NON GÉRÉE ---'), err);
     res.status(500).json({
         success: false,
         message: 'Erreur interne du serveur'
