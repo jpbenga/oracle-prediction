@@ -1,5 +1,3 @@
-// --- Fichier: backend-gcp/microservice-football/src/index.ts ---
-
 import express from 'express';
 import chalk from 'chalk';
 import cors, { CorsOptions } from 'cors';
@@ -26,7 +24,6 @@ const allowedOrigins = [
 
 const corsOptions: CorsOptions = {
     origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
-        // Permettre les requêtes sans origine pour les outils comme Postman
         if (!origin || allowedOrigins.indexOf(origin) !== -1) {
             callback(null, true);
         } else {
@@ -37,13 +34,11 @@ const corsOptions: CorsOptions = {
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
     credentials: true,
-    optionsSuccessStatus: 200 // Pour la compatibilité avec les anciens navigateurs
+    optionsSuccessStatus: 200
 };
 
-// Appliquer CORS avant toutes les routes. C'est ce middleware qui gère les requêtes OPTIONS (preflight).
 app.use(cors(corsOptions));
 
-// Middleware pour logger les requêtes entrantes
 app.use((req, res, next) => {
     console.log(chalk.cyan(`${req.method} ${req.path} - Origin: ${req.headers.origin || 'none'}`));
     next();
@@ -52,20 +47,14 @@ app.use((req, res, next) => {
 const PORT = process.env.PORT || 8080;
 
 // ====================================================================
-// ENDPOINTS
+// ROUTES DE L'APPLICATION
 // ====================================================================
 
-// --- ENDPOINT POUR LE JOB SCHEDULER PRINCIPAL ---
 app.get('/run-daily-pipeline', async (req, res) => {
   console.log(chalk.magenta.bold('--- Déclenchement du pipeline de jobs quotidien ---'));
- 
-  res.status(202).json({
-    message: 'Pipeline démarré avec succès',
-    timestamp: new Date().toISOString()
-  });
+  res.status(202).json({ message: 'Pipeline démarré avec succès' });
 
   try {
-    // Le reste du pipeline s'exécute en arrière-plan
     await runBacktestOrchestrator();
     await runBacktestSummarizer();
     await runPrediction();
@@ -79,12 +68,10 @@ app.get('/run-daily-pipeline', async (req, res) => {
   }
 });
 
-// --- ENDPOINT POUR LE WORKER PUB/SUB ---
 app.post('/pubsub-backtest-worker', async (req, res) => {
   if (!req.body || !req.body.message) {
-    return res.status(400).json({ error: 'Requête invalide : corps ou message manquant.' });
+    return res.status(400).json({ error: 'Requête invalide' });
   }
-
   try {
     const messageData = Buffer.from(req.body.message.data, 'base64').toString('utf-8');
     const messagePayload = JSON.parse(messageData) as BacktestWorkerMessage;
@@ -92,16 +79,14 @@ app.post('/pubsub-backtest-worker', async (req, res) => {
     res.status(204).send();
   } catch (error) {
     console.error(chalk.red('Erreur dans le worker Pub/Sub :'), error);
-    res.status(500).json({ error: 'Échec du traitement du message.' });
+    res.status(500).json({ error: 'Échec du traitement' });
   }
 });
 
-// --- ROUTES API POUR LE FRONT-END ---
 app.get('/api/tickets', async (req, res) => {
     try {
         const date = typeof req.query.date === 'string' ? req.query.date : new Date().toISOString().split('T')[0];
         const tickets = await firestoreService.getTicketsForDate(date);
-        
         if (tickets.length > 0) {
             res.status(200).json({ success: true, data: tickets });
         } else {
@@ -109,8 +94,7 @@ app.get('/api/tickets', async (req, res) => {
         }
     } catch (error) {
         console.error(chalk.red('Erreur /api/tickets:'), error);
-        const errorMessage = error instanceof Error ? error.message : 'Une erreur est survenue';
-        res.status(500).json({ success: false, message: "Erreur interne du serveur", error: errorMessage });
+        res.status(500).json({ success: false, message: "Erreur interne" });
     }
 });
 
@@ -118,7 +102,6 @@ app.get('/api/predictions', async (req, res) => {
     try {
         const date = typeof req.query.date === 'string' ? req.query.date : new Date().toISOString().split('T')[0];
         const predictions = await firestoreService.getPredictionsForDate(date);
-        
         if (predictions.length > 0) {
             res.status(200).json({ success: true, data: predictions });
         } else {
@@ -126,25 +109,39 @@ app.get('/api/predictions', async (req, res) => {
         }
     } catch (error) {
         console.error(chalk.red('Erreur /api/predictions:'), error);
-        const errorMessage = error instanceof Error ? error.message : 'Une erreur est survenue';
-        res.status(500).json({ success: false, message: "Erreur interne du serveur", error: errorMessage });
+        res.status(500).json({ success: false, message: "Erreur interne" });
     }
 });
 
-
-// --- GESTION DES ERREURS ET DÉMARRAGE ---
-
-// Route de santé
 app.get('/health', (req, res) => {
     res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
-// Gestionnaire 404
-app.use('*', (req, res) => {
-    res.status(404).json({ success: false, message: `Route non trouvée: ${req.method} ${req.path}` });
+// ====================================================================
+// GESTION DES ERREURS (DOIT ÊTRE À LA FIN)
+// ====================================================================
+
+// --- LA CORRECTION EST ICI ---
+// Gestion des erreurs 404 (route non trouvée)
+// Ce middleware est appelé si aucune des routes ci-dessus n'a correspondu.
+app.use((req, res, next) => {
+    console.log(chalk.yellow(`Route non trouvée: ${req.method} ${req.path}`));
+    res.status(404).json({
+        success: false,
+        message: `Route non trouvée: ${req.method} ${req.path}`
+    });
+});
+
+// Gestionnaire d'erreurs global
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error(chalk.red('Erreur non gérée:'), err);
+    res.status(500).json({
+        success: false,
+        message: 'Erreur interne du serveur'
+    });
 });
 
 app.listen(PORT, () => {
   console.log(chalk.green.bold(`🚀 Le microservice est démarré et écoute sur le port ${PORT}`));
-  console.log(chalk.cyan(`🌍 Origines CORS autorisées: ${allowedOrigins.join(', ')}`));
 });
+
