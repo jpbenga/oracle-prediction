@@ -1,8 +1,7 @@
-# swagger.yaml - Stratégie de transmission ("passthrough")
 swagger: '2.0'
 info:
   title: 'Oracle Prediction API (Passthrough Strategy)'
-  version: '10.0.0' # Version majeure pour marquer la nouvelle stratégie
+  version: '10.0.1' # Mise à jour de la version pour refléter les changements
 schemes:
   - https
 produces:
@@ -18,10 +17,42 @@ securityDefinitions:
     x-google-audiences: "oracle-prediction-app"
 
 paths:
-  # Règle "joker" pour capturer toutes les URLs (ex: /api/tickets, /health)
+  /api/tickets:
+    options:
+      summary: "CORS preflight for /api/tickets"
+      operationId: "cors-preflight-tickets"
+      x-google-backend:
+        address: https://oracle-prediction-football-321557095918.europe-west1.run.app
+        path_translation: APPEND_PATH_TO_ADDRESS
+      responses:
+        '200':
+          description: "CORS preflight response"
+          headers:
+            Access-Control-Allow-Origin:
+              type: string
+            Access-Control-Allow-Methods:
+              type: string
+            Access-Control-Allow-Headers:
+              type: string
+    get:
+      summary: "Get tickets"
+      operationId: "get-tickets"
+      security:
+        - firebase: []
+      x-google-backend:
+        address: https://oracle-prediction-football-321557095918.europe-west1.run.app
+        path_translation: APPEND_PATH_TO_ADDRESS
+      parameters:
+        - in: query
+          name: date
+          type: string
+          required: false
+      responses:
+        '200':
+          description: "Successful response"
+          schema:
+            type: object
   /{proxy+}:
-    # La méthode OPTIONS est spéciale: on la transmet au backend SANS appliquer de sécurité.
-    # C'est la clé de la résolution du problème 404.
     options:
       summary: "CORS preflight passthrough"
       operationId: "cors-preflight-passthrough"
@@ -29,11 +60,8 @@ paths:
         address: https://oracle-prediction-football-321557095918.europe-west1.run.app
         path_translation: APPEND_PATH_TO_ADDRESS
       responses:
-        # La réponse (200 OK) sera générée par le backend, la Gateway n'a qu'à la transmettre.
         'default':
           description: "CORS preflight response from backend"
-
-    # Pour toutes les autres méthodes (GET, POST...), on applique la sécurité Firebase.
     get:
       summary: "Generic GET with security"
       operationId: "get-passthrough"
@@ -45,4 +73,3 @@ paths:
       responses:
         'default':
           description: "Default GET response from backend"
-

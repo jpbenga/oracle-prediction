@@ -37,11 +37,19 @@ const corsOptions: CorsOptions = {
     optionsSuccessStatus: 200
 };
 
+// Appliquer le middleware CORS en premier
 app.use(cors(corsOptions));
 
+// Journalisation des requêtes
 app.use((req, res, next) => {
     console.log(chalk.cyan(`${req.method} ${req.path} - Origin: ${req.headers.origin || 'none'}`));
     next();
+});
+
+// Route explicite pour gérer les requêtes OPTIONS sur /api/tickets
+app.options('/api/tickets', (req, res) => {
+    console.log(chalk.green('Gestion de la requête OPTIONS pour /api/tickets'));
+    res.status(200).send(); // Le middleware cors ajoute les en-têtes nécessaires
 });
 
 const PORT = process.env.PORT || 8080;
@@ -51,36 +59,36 @@ const PORT = process.env.PORT || 8080;
 // ====================================================================
 
 app.get('/run-daily-pipeline', async (req, res) => {
-  console.log(chalk.magenta.bold('--- Déclenchement du pipeline de jobs quotidien ---'));
-  res.status(202).json({ message: 'Pipeline démarré avec succès' });
+    console.log(chalk.magenta.bold('--- Déclenchement du pipeline de jobs quotidien ---'));
+    res.status(202).json({ message: 'Pipeline démarré avec succès' });
 
-  try {
-    await runBacktestOrchestrator();
-    await runBacktestSummarizer();
-    await runPrediction();
-    await runTicketGenerator();
-    await runResultsUpdater();
-    await runPredictionCompleter();
-    await runLeagueOrchestrator();
-    console.log(chalk.magenta.bold('\n--- Pipeline de jobs quotidien terminé avec succès ---'));
-  } catch (error) {
-    console.error(chalk.red('Erreur critique lors de l\'exécution du pipeline :'), error);
-  }
+    try {
+        await runBacktestOrchestrator();
+        await runBacktestSummarizer();
+        await runPrediction();
+        await runTicketGenerator();
+        await runResultsUpdater();
+        await runPredictionCompleter();
+        await runLeagueOrchestrator();
+        console.log(chalk.magenta.bold('\n--- Pipeline de jobs quotidien terminé avec succès ---'));
+    } catch (error) {
+        console.error(chalk.red('Erreur critique lors de l\'exécution du pipeline :'), error);
+    }
 });
 
 app.post('/pubsub-backtest-worker', async (req, res) => {
-  if (!req.body || !req.body.message) {
-    return res.status(400).json({ error: 'Requête invalide' });
-  }
-  try {
-    const messageData = Buffer.from(req.body.message.data, 'base64').toString('utf-8');
-    const messagePayload = JSON.parse(messageData) as BacktestWorkerMessage;
-    runBacktestWorker(messagePayload);
-    res.status(204).send();
-  } catch (error) {
-    console.error(chalk.red('Erreur dans le worker Pub/Sub :'), error);
-    res.status(500).json({ error: 'Échec du traitement' });
-  }
+    if (!req.body || !req.body.message) {
+        return res.status(400).json({ error: 'Requête invalide' });
+    }
+    try {
+        const messageData = Buffer.from(req.body.message.data, 'base64').toString('utf-8');
+        const messagePayload = JSON.parse(messageData) as BacktestWorkerMessage;
+        runBacktestWorker(messagePayload);
+        res.status(204).send();
+    } catch (error) {
+        console.error(chalk.red('Erreur dans le worker Pub/Sub :'), error);
+        res.status(500).json({ error: 'Échec du traitement' });
+    }
 });
 
 app.get('/api/tickets', async (req, res) => {
@@ -121,9 +129,6 @@ app.get('/health', (req, res) => {
 // GESTION DES ERREURS (DOIT ÊTRE À LA FIN)
 // ====================================================================
 
-// --- LA CORRECTION EST ICI ---
-// Gestion des erreurs 404 (route non trouvée)
-// Ce middleware est appelé si aucune des routes ci-dessus n'a correspondu.
 app.use((req, res, next) => {
     console.log(chalk.yellow(`Route non trouvée: ${req.method} ${req.path}`));
     res.status(404).json({
@@ -132,7 +137,6 @@ app.use((req, res, next) => {
     });
 });
 
-// Gestionnaire d'erreurs global
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
     console.error(chalk.red('Erreur non gérée:'), err);
     res.status(500).json({
@@ -142,5 +146,5 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 });
 
 app.listen(PORT, () => {
-  console.log(chalk.green.bold(`🚀 Le microservice est démarré et écoute sur le port ${PORT}`));
+    console.log(chalk.green.bold(`🚀 Le microservice est démarré et écoute sur le port ${PORT}`));
 });
