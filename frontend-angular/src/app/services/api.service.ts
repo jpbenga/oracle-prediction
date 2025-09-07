@@ -1,32 +1,44 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http'; // 1. Importez HttpClient
-import { Observable } from 'rxjs';
-import { PredictionsApiResponse, TicketsApiResponse } from '../types/api-types';
+import { HttpClient } from '@angular/common/http';
+import { Observable, of } from 'rxjs';
+import { catchError, map } from 'rxjs/operators';
+import { Prediction, Ticket } from '../types/api-types';
+
+interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  message?: string;
+}
 
 @Injectable({
   providedIn: 'root'
 })
 export class ApiService {
 
-  // 2. Définissez l'URL de base de votre API déployée
-  private baseUrl = 'https://oracle-prediction-gateway-43pysj5a.ew.gateway.dev/api';
+  private baseUrl = 'https://config-finale-1-43pysj5a.ew.gateway.dev';
 
-  // 3. Injectez HttpClient dans le constructeur
   constructor(private http: HttpClient) { }
 
-  /**
-   * Récupère les tickets depuis votre API backend.
-   */
-  getTickets(date?: string): Observable<TicketsApiResponse> {
-    const url = date ? `${this.baseUrl}/tickets?date=${date}` : `${this.baseUrl}/tickets`;
-    return this.http.get<TicketsApiResponse>(url);
+  getTickets(date: string): Observable<Ticket[]> {
+    const url = `${this.baseUrl}/api/tickets?date=${date}`;
+    return this.http.get<ApiResponse<Ticket[]>>(url).pipe(
+      map(response => (response.success && response.data) ? response.data : []),
+      catchError(this.handleError<Ticket[]>('getTickets', []))
+    );
   }
 
-  /**
-   * Récupère les prédictions depuis votre API backend.
-   */
-  getPredictions(date?: string): Observable<PredictionsApiResponse> {
-    const url = date ? `${this.baseUrl}/predictions?date=${date}` : `${this.baseUrl}/predictions`;
-    return this.http.get<PredictionsApiResponse>(url);
+  getPredictions(date: string): Observable<Prediction[]> {
+    const url = `${this.baseUrl}/api/predictions?date=${date}`;
+    return this.http.get<ApiResponse<Prediction[]>>(url).pipe(
+      map(response => (response.success && response.data) ? response.data : []),
+      catchError(this.handleError<Prediction[]>('getPredictions', []))
+    );
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(`Erreur dans ${operation}:`, error);
+      return of(result as T);
+    };
   }
 }
