@@ -1,5 +1,4 @@
 import express from 'express';
-import chalk from 'chalk';
 import cors, { CorsOptions } from 'cors';
 import { runLeagueOrchestrator } from './jobs/league-orchestrator.job';
 import { runPredictionCompleter } from './jobs/prediction-completer.job';
@@ -11,7 +10,7 @@ import { runPrediction } from './jobs/prediction.job';
 import { runBacktestSummarizer } from './jobs/backtest-summarizer.job';
 import { firestoreService } from './services/Firestore.service';
 
-console.log(chalk.blue.bold('--- Démarrage du fichier index.ts ---'));
+console.log('--- Démarrage du microservice football ---');
 
 const app = express();
 app.use(express.json());
@@ -27,27 +26,18 @@ const allowedOrigins = [
 const corsOptions: CorsOptions = {
     origin: allowedOrigins,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
     optionsSuccessStatus: 200
 };
 
-// Appliquer le middleware CORS en premier
 app.use(cors(corsOptions));
 
-// Journalisation détaillée des requêtes
+// Middleware de journalisation simple
 app.use((req, res, next) => {
-    console.log(chalk.cyan.bold('\n--- NOUVELLE REQUÊTE ---'));
-    console.log(chalk.cyan(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`));
-    console.log(chalk.cyan('Origin:'), req.headers.origin || 'none');
-    console.log(chalk.cyan('Headers:'), JSON.stringify(req.headers, null, 2));
-    if (req.body && Object.keys(req.body).length > 0) {
-        console.log(chalk.cyan('Body:'), JSON.stringify(req.body, null, 2));
-    }
-    console.log(chalk.cyan.bold('\n--- FIN DE LA REQUÊTE ---\n'));
+    console.log(`[${new Date().toISOString()}] Requête reçue : ${req.method} ${req.originalUrl}`);
     next();
 });
-
 
 const PORT = process.env.PORT || 8080;
 
@@ -55,9 +45,48 @@ const PORT = process.env.PORT || 8080;
 // ROUTES DE L'APPLICATION
 // ====================================================================
 
+app.get('/api/tickets', async (req, res) => {
+    try {
+        const date = typeof req.query.date === 'string' ? req.query.date : new Date().toISOString().split('T')[0];
+        console.log(`Recherche de tickets pour la date: ${date}`);
+        const tickets = await firestoreService.getTicketsForDate(date);
+
+        if (tickets.length > 0) {
+            res.status(200).json({ success: true, data: tickets });
+        } else {
+            res.status(404).json({ success: false, message: `Aucun ticket trouvé pour la date ${date}` });
+        }
+    } catch (error) {
+        console.error('Erreur sur /api/tickets:', error);
+        res.status(500).json({ success: false, message: "Erreur interne du serveur lors de la récupération des tickets." });
+    }
+});
+
+app.get('/api/predictions', async (req, res) => {
+    try {
+        const date = typeof req.query.date === 'string' ? req.query.date : new Date().toISOString().split('T')[0];
+        console.log(`Recherche de prédictions pour la date: ${date}`);
+        const predictions = await firestoreService.getPredictionsForDate(date);
+
+        if (predictions.length > 0) {
+            res.status(200).json({ success: true, data: predictions });
+        } else {
+            res.status(404).json({ success: false, message: `Aucune prédiction trouvée pour la date ${date}` });
+        }
+    } catch (error) {
+        console.error('Erreur sur /api/predictions:', error);
+        res.status(500).json({ success: false, message: "Erreur interne du serveur lors de la récupération des prédictions." });
+    }
+});
+
+app.get('/health', (req, res) => {
+    console.log('Health Check demandé. Service en bonne santé.');
+    res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
+});
+
 app.get('/run-daily-pipeline', async (req, res) => {
-    console.log(chalk.magenta.bold('--- Déclenchement du pipeline de jobs quotidien ---'));
-    res.status(202).json({ message: 'Pipeline démarré avec succès' });
+    console.log('--- Déclenchement manuel du pipeline de jobs quotidien ---');
+    res.status(202).json({ message: 'Le pipeline a démarré en arrière-plan.' });
 
     try {
         await runBacktestOrchestrator();
@@ -67,14 +96,15 @@ app.get('/run-daily-pipeline', async (req, res) => {
         await runResultsUpdater();
         await runPredictionCompleter();
         await runLeagueOrchestrator();
-        console.log(chalk.magenta.bold('\n--- Pipeline de jobs quotidien terminé avec succès ---'));
+        console.log('--- Pipeline de jobs quotidien terminé avec succès ---');
     } catch (error) {
-        console.error(chalk.red('Erreur critique lors de l\'exécution du pipeline :'), error);
+        console.error('Erreur critique lors de l\'exécution du pipeline :', error);
     }
 });
 
 app.post('/pubsub-backtest-worker', async (req, res) => {
     if (!req.body || !req.body.message) {
+        console.error('Requête Pub/Sub invalide : corps ou message manquant.');
         return res.status(400).json({ error: 'Requête invalide' });
     }
     try {
@@ -83,44 +113,9 @@ app.post('/pubsub-backtest-worker', async (req, res) => {
         runBacktestWorker(messagePayload);
         res.status(204).send();
     } catch (error) {
-        console.error(chalk.red('Erreur dans le worker Pub/Sub :'), error);
-        res.status(500).json({ error: 'Échec du traitement' });
+        console.error('Erreur dans le worker Pub/Sub :', error);
+        res.status(500).json({ error: 'Échec du traitement du message' });
     }
-});
-
-app.get('/api/tickets', async (req, res) => {
-    try {
-        const date = typeof req.query.date === 'string' ? req.query.date : new Date().toISOString().split('T')[0];
-        const tickets = await firestoreService.getTicketsForDate(date);
-        if (tickets.length > 0) {
-            res.status(200).json({ success: true, data: tickets });
-        } else {
-            res.status(404).json({ success: false, message: `Aucun ticket trouvé pour la date ${date}` });
-        }
-    } catch (error) {
-        console.error(chalk.red('Erreur /api/tickets:'), error);
-        res.status(500).json({ success: false, message: "Erreur interne" });
-    }
-});
-
-app.get('/api/predictions', async (req, res) => {
-    try {
-        const date = typeof req.query.date === 'string' ? req.query.date : new Date().toISOString().split('T')[0];
-        const predictions = await firestoreService.getPredictionsForDate(date);
-        if (predictions.length > 0) {
-            res.status(200).json({ success: true, data: predictions });
-        } else {
-            res.status(404).json({ success: false, message: `Aucune prédiction trouvée pour la date ${date}` });
-        }
-    } catch (error) {
-        console.error(chalk.red('Erreur /api/predictions:'), error);
-        res.status(500).json({ success: false, message: "Erreur interne" });
-    }
-});
-
-app.get('/health', (req, res) => {
-    console.log(chalk.green('--- Réponse du Health Check ---'));
-    res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
 // ====================================================================
@@ -128,8 +123,6 @@ app.get('/health', (req, res) => {
 // ====================================================================
 
 app.use((req, res, next) => {
-    console.log(chalk.yellow.bold(`--- ROUTE NON TROUVÉE ---`));
-    console.log(chalk.yellow(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`));
     res.status(404).json({
         success: false,
         message: `Route non trouvée: ${req.method} ${req.path}`
@@ -137,7 +130,7 @@ app.use((req, res, next) => {
 });
 
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-    console.error(chalk.red.bold('--- ERREUR NON GÉRÉE ---'), err);
+    console.error('--- ERREUR SERVEUR NON GÉRÉE ---', err);
     res.status(500).json({
         success: false,
         message: 'Erreur interne du serveur'
@@ -145,5 +138,5 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 });
 
 app.listen(PORT, () => {
-    console.log(chalk.green.bold(`🚀 Le microservice est démarré et écoute sur le port ${PORT}`));
+    console.log(`🚀 Le microservice est démarré et écoute sur le port ${PORT}`);
 });
