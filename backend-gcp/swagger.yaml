@@ -25,7 +25,7 @@ paths:
       summary: Get daily predictions
       operationId: get-predictions
       x-google-backend:
-        address: https://oracle-prediction-football-co4b4rv5mq-ew.a.run.app
+        address: https://oracle-prediction-football-321557095918.europe-west1.run.app
         path_translation: APPEND_PATH_TO_ADDRESS
       responses:
         '200':

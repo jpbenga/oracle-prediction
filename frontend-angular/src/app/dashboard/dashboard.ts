@@ -9,7 +9,7 @@ import { PredictionsList } from '../components/predictions-list/predictions-list
 import { TicketsList } from '../components/tickets-list/tickets-list';
 import { ArchitectsSimulator } from '../components/architects-simulator/architects-simulator';
 import { EmptyStateComponent } from '../components/empty-state/empty-state.component';
-import { PredictionsApiResponse, TicketsApiResponse } from '../types/api-types';
+import { Prediction, PredictionsApiResponse, Ticket, TicketsApiResponse } from '../types/api-types';
 import { catchError, tap } from 'rxjs/operators';
 import { of } from 'rxjs';
 
@@ -61,10 +61,17 @@ export class Dashboard implements OnInit {
             message: 'Le flux de données des prédictions a été corrompu. Impossible de contacter la Source.'
           };
         }
-        return of({});
+        return of([]);
       })
     ).subscribe(data => {
-      this.predictionsData = data;
+      this.predictionsData = (data || []).reduce((acc, prediction) => {
+        const league = prediction.leagueName;
+        if (!acc[league]) {
+          acc[league] = [];
+        }
+        acc[league].push(prediction);
+        return acc;
+      }, {} as PredictionsApiResponse);
     });
 
     this.apiService.getTickets(date).pipe(
@@ -78,7 +85,7 @@ export class Dashboard implements OnInit {
             };
           }
         }
-        return of({});
+        return of([]);
       }),
       tap(() => {
         if (this.error) { // If an error occurred, stop loading
@@ -86,7 +93,20 @@ export class Dashboard implements OnInit {
         }
       })
     ).subscribe(data => {
-      this.ticketsData = data;
+      if (data && data.length > 0) {
+        this.ticketsData = {
+          [date]: (data || []).reduce((acc, ticket) => {
+            const title = ticket.title;
+            if (!acc[title]) {
+              acc[title] = [];
+            }
+            acc[title].push(ticket);
+            return acc;
+          }, {} as { [key in Ticket['title']]?: Ticket[] })
+        };
+      } else {
+        this.ticketsData = {};
+      }
       this.isLoading = false; // Also stop loading on success
     });
   }
