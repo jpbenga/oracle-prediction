@@ -15,7 +15,7 @@ interface ApiResponse<T> {
 })
 export class ApiService {
 
-  private baseUrl = 'https://config-finale-1-43pysj5a.ew.gateway.dev';
+  private baseUrl = 'https://oracle-prediction-gateway-43pysj5a.ew.gateway.dev';
 
   constructor(private http: HttpClient) { }
 
