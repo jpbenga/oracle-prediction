@@ -1,5 +1,5 @@
 import express from 'express';
-import cors, { CorsOptions } from 'cors';
+import cors from 'cors';
 import { runLeagueOrchestrator } from './jobs/league-orchestrator.job';
 import { runPredictionCompleter } from './jobs/prediction-completer.job';
 import { runTicketGenerator } from './jobs/ticket-generator.job';
@@ -15,35 +15,15 @@ console.log('--- Démarrage du microservice football ---');
 const app = express();
 app.use(express.json());
 
-// --- Configuration CORS ---
-const allowedOrigins = [
-    'https://oracle-prediction-app.web.app',
-    'https://oracle-prediction-app.firebaseapp.com',
-    process.env.CORS_ORIGIN || 'http://localhost:4200',
-    'https://4200-firebase-oracle-prediction-1756797510260.cluster-64pjnskmlbaxowh5lzq6i7v4ra.cloudworkstations.dev'
-];
+app.use(cors());
+app.options('*', cors());
 
-const corsOptions: CorsOptions = {
-    origin: allowedOrigins,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true,
-    optionsSuccessStatus: 200
-};
-
-app.use(cors(corsOptions));
-
-// Middleware de journalisation simple
 app.use((req, res, next) => {
     console.log(`[${new Date().toISOString()}] Requête reçue : ${req.method} ${req.originalUrl}`);
     next();
 });
 
 const PORT = process.env.PORT || 8080;
-
-// ====================================================================
-// ROUTES DE L'APPLICATION
-// ====================================================================
 
 app.get('/api/tickets', async (req, res) => {
     try {
@@ -117,10 +97,6 @@ app.post('/pubsub-backtest-worker', async (req, res) => {
         res.status(500).json({ error: 'Échec du traitement du message' });
     }
 });
-
-// ====================================================================
-// GESTION DES ERREURS (DOIT ÊTRE À LA FIN)
-// ====================================================================
 
 app.use((req, res, next) => {
     res.status(404).json({

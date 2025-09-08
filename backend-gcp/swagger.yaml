@@ -1,14 +1,11 @@
 swagger: '2.0'
 info:
   title: Oracle Prediction API (Stable)
-  version: '2.0.0'
+  version: '2.0.1'
 schemes:
   - https
 produces:
   - application/json
-
-security:
-  - firebase: []
 
 securityDefinitions:
   firebase:
@@ -24,45 +21,100 @@ paths:
     get:
       summary: Get daily predictions
       operationId: get-predictions
+      security:
+        - firebase: []
+      parameters:
+        - name: date
+          in: query
+          type: string
+          description: Date in YYYY-MM-DD format
       x-google-backend:
         address: https://oracle-prediction-football-321557095918.europe-west1.run.app
         path_translation: APPEND_PATH_TO_ADDRESS
       responses:
         '200':
           description: A successful response
+        '404':
+          description: No predictions found
+        '500':
+          description: Internal server error
     options:
-      summary: CORS support
-      operationId: cors-predictions
-      security: []
+      summary: CORS preflight for predictions
+      operationId: options-predictions
+      parameters:
+        - name: Access-Control-Request-Method
+          in: header
+          type: string
+        - name: Access-Control-Request-Headers
+          in: header
+          type: string
+        - name: Origin
+          in: header
+          type: string
+      x-google-backend:
+        address: https://oracle-prediction-football-321557095918.europe-west1.run.app
+        path_translation: APPEND_PATH_TO_ADDRESS
       responses:
-        '204':
-          description: "No Content"
+        '200':
+          description: CORS preflight response
+          headers:
+            Access-Control-Allow-Origin:
+              type: string
+            Access-Control-Allow-Methods:
+              type: string
+            Access-Control-Allow-Headers:
+              type: string
+            Access-Control-Max-Age:
+              type: string
 
   /api/tickets:
     get:
       summary: Get daily tickets
       operationId: get-tickets
+      security:
+        - firebase: []
+      parameters:
+        - name: date
+          in: query
+          type: string
+          description: Date in YYYY-MM-DD format
       x-google-backend:
-        address: https://oracle-prediction-football-co4b4rv5mq-ew.a.run.app
+        address: https://oracle-prediction-football-321557095918.europe-west1.run.app
         path_translation: APPEND_PATH_TO_ADDRESS
       responses:
         '200':
           description: A successful response
+        '404':
+          description: No tickets found
+        '500':
+          description: Internal server error
     options:
-      summary: CORS support
-      operationId: cors-tickets
-      security: []
+      summary: CORS preflight for tickets
+      operationId: options-tickets
+      parameters:
+        - name: Access-Control-Request-Method
+          in: header
+          type: string
+        - name: Access-Control-Request-Headers
+          in: header
+          type: string
+        - name: Origin
+          in: header
+          type: string
+      x-google-backend:
+        address: https://oracle-prediction-football-321557095918.europe-west1.run.app
+        path_translation: APPEND_PATH_TO_ADDRESS
       responses:
-        '204':
-          description: "No Content"
+        '200':
+          description: CORS preflight response
+          headers:
+            Access-Control-Allow-Origin:
+              type: string
+            Access-Control-Allow-Methods:
+              type: string
+            Access-Control-Allow-Headers:
+              type: string
+            Access-Control-Max-Age:
+              type: string
 
-x-google-cors:
-  allow_origin:
-    - "https://oracle-prediction-app.firebaseapp.com"
-    - "https://oracle-prediction-app.web.app"
-  allow_methods:
-    - GET
-    - OPTIONS
-  allow_headers:
-    - Authorization
-    - Content-Type
+# Note: Removing x-google-cors since we're handling CORS in the backend
