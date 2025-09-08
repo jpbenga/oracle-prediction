@@ -15,7 +15,7 @@ interface ApiResponse<T> {
 })
 export class ApiService {
 
-  private baseUrl = 'https://oracle-prediction-football-321557095918.europe-west1.run.app'
+  private baseUrl = 'https://config-principale-v2-43pysj5a.ew.gateway.dev';
 
   constructor(private http: HttpClient) { }
 
