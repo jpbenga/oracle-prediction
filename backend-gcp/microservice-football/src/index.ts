@@ -15,7 +15,6 @@ console.log('--- Démarrage du microservice football ---');
 const app = express();
 app.use(express.json());
 
-// La seule ligne nécessaire pour un CORS fonctionnel
 app.use(cors());
 
 app.use((req, res, next) => {
@@ -24,6 +23,12 @@ app.use((req, res, next) => {
 });
 
 const PORT = process.env.PORT || 8080;
+
+// ====================================================================
+// ROUTES DE L'APPLICATION
+// ====================================================================
+
+console.log("--- Début de l'enregistrement des routes ---");
 
 app.get('/api/tickets', async (req, res) => {
     try {
@@ -41,6 +46,8 @@ app.get('/api/tickets', async (req, res) => {
         res.status(500).json({ success: false, message: "Erreur interne du serveur lors de la récupération des tickets." });
     }
 });
+console.log("Preuve : Route GET /api/tickets enregistrée.");
+
 
 app.get('/api/predictions', async (req, res) => {
     try {
@@ -58,11 +65,15 @@ app.get('/api/predictions', async (req, res) => {
         res.status(500).json({ success: false, message: "Erreur interne du serveur lors de la récupération des prédictions." });
     }
 });
+console.log("Preuve : Route GET /api/predictions enregistrée.");
+
 
 app.get('/health', (req, res) => {
     console.log('Health Check demandé. Service en bonne santé.');
     res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
+console.log("Preuve : Route GET /health enregistrée.");
+
 
 app.get('/run-daily-pipeline', async (req, res) => {
     console.log('--- Déclenchement manuel du pipeline de jobs quotidien ---');
@@ -97,6 +108,12 @@ app.post('/pubsub-backtest-worker', async (req, res) => {
         res.status(500).json({ error: 'Échec du traitement du message' });
     }
 });
+
+console.log("--- Fin de l'enregistrement des routes ---");
+
+// ====================================================================
+// GESTION DES ERREURS (DOIT ÊTRE À LA FIN)
+// ====================================================================
 
 app.use((req, res, next) => {
     res.status(404).json({
