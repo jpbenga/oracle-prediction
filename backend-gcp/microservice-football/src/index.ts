@@ -15,8 +15,8 @@ console.log('--- Démarrage du microservice football ---');
 const app = express();
 app.use(express.json());
 
+// La seule ligne nécessaire pour un CORS fonctionnel
 app.use(cors());
-app.options('*', cors());
 
 app.use((req, res, next) => {
     console.log(`[${new Date().toISOString()}] Requête reçue : ${req.method} ${req.originalUrl}`);
