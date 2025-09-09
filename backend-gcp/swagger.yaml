@@ -1,7 +1,7 @@
 swagger: '2.0'
 info:
-  title: Oracle Prediction API (Final Stable)
-  version: '4.0.0' # Nouvelle version finale
+  title: Oracle Prediction API (Final Stable with Manual CORS)
+  version: '7.0.0'
 schemes:
   - https
 produces:
@@ -29,6 +29,21 @@ paths:
       responses:
         '200':
           description: A successful response
+    options:
+      summary: CORS support
+      operationId: cors-predictions-handler
+      responses:
+        '204':
+          description: "No Content"
+          headers:
+            Access-Control-Allow-Origin:
+              type: "string"
+            Access-Control-Allow-Methods:
+              type: "string"
+            Access-Control-Allow-Headers:
+              type: "string"
+            Access-Control-Max-Age:
+              type: "string"
 
   /api/tickets:
     get:
@@ -42,14 +57,18 @@ paths:
       responses:
         '200':
           description: A successful response
-
-x-google-cors:
-  allow_origin:
-    - "https://oracle-prediction-app.web.app"
-    - "https://oracle-prediction-app.firebaseapp.com"
-  allow_methods:
-    - "GET"
-    - "OPTIONS"
-  allow_headers:
-    - "Authorization"
-    - "Content-Type"
+    options:
+      summary: CORS support
+      operationId: cors-tickets-handler
+      responses:
+        '204':
+          description: "No Content"
+          headers:
+            Access-Control-Allow-Origin:
+              type: "string"
+            Access-Control-Allow-Methods:
+              type: "string"
+            Access-Control-Allow-Headers:
+              type: "string"
+            Access-Control-Max-Age:
+              type: "string"
