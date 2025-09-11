@@ -1,0 +1,81 @@
+steps:
+# Installer les dépendances et builder chaque fonction (si nécessaire)
+# Note: Pour l'instant, nos fonctions n'ont pas de build step explicite (e.g. tsc), 
+# le déploiement gcloud s'en charge. Cette étape est un placeholder.
+
+# Déploiement de backtest-orchestrator (HTTP)
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  args:
+  - 'gcloud'
+  - 'functions'
+  - 'deploy'
+  - 'backtest-orchestrator'
+  - '--gen2'
+  - '--runtime'
+  - 'nodejs20'
+  - '--trigger-http'
+  - '--allow-unauthenticated'
+  - '--region=europe-west1'
+  - '--source=./cloud-functions/backtest-orchestrator'
+  - '--entry-point=run'
+
+# Déploiement de backtest-summarizer (Pub/Sub)
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  args:
+  - 'gcloud'
+  - 'functions'
+  - 'deploy'
+  - 'backtest-summarizer'
+  - '--gen2'
+  - '--runtime'
+  - 'nodejs20'
+  - '--trigger-topic=backtest-completed'
+  - '--region=europe-west1'
+  - '--source=./cloud-functions/backtest-summarizer'
+  - '--entry-point=run'
+
+# Déploiement de prediction (Pub/Sub)
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  args:
+  - 'gcloud'
+  - 'functions'
+  - 'deploy'
+  - 'prediction'
+  - '--gen2'
+  - '--runtime'
+  - 'nodejs20'
+  - '--trigger-topic=summary-completed'
+  - '--region=europe-west1'
+  - '--source=./cloud-functions/prediction'
+  - '--entry-point=run'
+
+# Déploiement de prediction-completer (HTTP)
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  args:
+  - 'gcloud'
+  - 'functions'
+  - 'deploy'
+  - 'prediction-completer'
+  - '--gen2'
+  - '--runtime'
+  - 'nodejs20'
+  - '--trigger-http'
+  - '--allow-unauthenticated'
+  - '--region=europe-west1'
+  - '--source=./cloud-functions/prediction-completer'
+  - '--entry-point=run'
+
+# Déploiement de ticket-generator (Pub/Sub)
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  args:
+  - 'gcloud'
+  - 'functions'
+  - 'deploy'
+  - 'ticket-generator'
+  - '--gen2'
+  - '--runtime'
+  - 'nodejs20'
+  - '--trigger-topic=completer-ran'
+  - '--region=europe-west1'
+  - '--source=./cloud-functions/ticket-generator'
+  - '--entry-point=run'
