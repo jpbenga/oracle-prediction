@@ -79,3 +79,6 @@ steps:
   - '--region=europe-west1'
   - '--source=./cloud-functions/ticket-generator'
   - '--entry-point=run'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
