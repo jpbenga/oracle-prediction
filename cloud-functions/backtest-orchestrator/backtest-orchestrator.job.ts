@@ -2,12 +2,12 @@
 
 import { PubSub } from '@google-cloud/pubsub';
 import chalk from 'chalk';
-import { apiFootballService } from '../services/ApiFootball.service';
-import { footballConfig } from '../config/football.config';
-import { Match } from '../types/football.types';
+import { apiFootballService } from '../common/services/ApiFootball.service';
+import { footballConfig } from '../common/config/football.config';
+import { Match } from '../common/types/football.types';
 
 const pubSubClient = new PubSub();
-const topicName = 'backtest-jobs';
+const topicName = 'backtest-completed';
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export async function runBacktestOrchestrator() {

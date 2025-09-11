@@ -1,0 +1,15 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Les utilisateurs authentifiés peuvent lire les tickets et les prédictions
+    match /tickets/{ticketId} {
+      allow read: if request.auth != null;
+      allow write: if false; // Personne ne peut écrire depuis le front
+    }
+    match /predictions/{predictionId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+    // ... autres règles pour les profils utilisateurs, etc.
+  }
+}

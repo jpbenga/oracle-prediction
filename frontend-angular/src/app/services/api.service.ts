@@ -1,44 +1,44 @@
-import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { Observable, of } from 'rxjs';
-import { catchError, map } from 'rxjs/operators';
+import { Injectable, inject } from '@angular/core';
+import { Observable } from 'rxjs';
 import { Prediction, Ticket } from '../types/api-types';
-
-interface ApiResponse<T> {
-  success: boolean;
-  data?: T;
-  message?: string;
-}
+import { collection, query, where, onSnapshot, Firestore } from '@angular/fire/firestore';
 
 @Injectable({
   providedIn: 'root'
 })
 export class ApiService {
 
-  private baseUrl = 'https://config-principale-v2-43pysj5a.ew.gateway.dev';
-
-  constructor(private http: HttpClient) { }
+  private firestore: Firestore = inject(Firestore);
 
   getTickets(date: string): Observable<Ticket[]> {
-    const url = `${this.baseUrl}/api/tickets?date=${date}`;
-    return this.http.get<ApiResponse<Ticket[]>>(url).pipe(
-      map(response => (response.success && response.data) ? response.data : []),
-      catchError(this.handleError<Ticket[]>('getTickets', []))
-    );
+    const ticketsCollection = collection(this.firestore, 'tickets');
+    const q = query(ticketsCollection, where("creation_date", "==", date));
+
+    return new Observable(observer => {
+      const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const tickets: Ticket[] = [];
+        querySnapshot.forEach((doc) => {
+          tickets.push({ id: doc.id, ...doc.data() } as Ticket);
+        });
+        observer.next(tickets);
+      });
+      return () => unsubscribe();
+    });
   }
 
   getPredictions(date: string): Observable<Prediction[]> {
-    const url = `${this.baseUrl}/api/predictions?date=${date}`;
-    return this.http.get<ApiResponse<Prediction[]>>(url).pipe(
-      map(response => (response.success && response.data) ? response.data : []),
-      catchError(this.handleError<Prediction[]>('getPredictions', []))
-    );
-  }
+    const predictionsCollection = collection(this.firestore, 'predictions');
+    const q = query(predictionsCollection, where("matchDate", ">=", date + "T00:00:00.000Z"), where("matchDate", "<=", date + "T23:59:59.999Z"));
 
-  private handleError<T>(operation = 'operation', result?: T) {
-    return (error: any): Observable<T> => {
-      console.error(`Erreur dans ${operation}:`, error);
-      return of(result as T);
-    };
+    return new Observable(observer => {
+      const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const predictions: Prediction[] = [];
+        querySnapshot.forEach((doc) => {
+          predictions.push({ id: doc.id, ...doc.data() } as Prediction);
+        });
+        observer.next(predictions);
+      });
+      return () => unsubscribe();
+    });
   }
 }

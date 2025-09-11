@@ -1,8 +1,8 @@
 // backend-gcp/microservice-football/src/jobs/backtest-summarizer.job.ts
 
 import chalk from 'chalk';
-import { firestoreService } from '../services/Firestore.service';
-import { BacktestResult, TrancheAnalysis, BacktestBilan } from '../types/football.types';
+import { firestoreService } from '../common/services/Firestore.service';
+import { BacktestResult, TrancheAnalysis, BacktestBilan } from '../common/types/football.types';
 
 /**
  * Retourne la clé de la tranche de confiance pour un score donné.

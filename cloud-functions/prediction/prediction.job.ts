@@ -1,12 +1,12 @@
 // backend-gcp/microservice-football/src/jobs/prediction.job.ts
 
 import chalk from 'chalk';
-import { footballConfig } from '../config/football.config';
-import { apiFootballService } from '../services/ApiFootball.service';
-import { gestionJourneeService } from '../services/GestionJournee.service';
-import { analyseMatchService } from '../services/AnalyseMatch.service';
-import { firestoreService } from '../services/Firestore.service';
-import { TrancheAnalysis } from '../types/football.types';
+import { footballConfig } from '../common/config/football.config';
+import { apiFootballService } from '../common/services/ApiFootball.service';
+import { gestionJourneeService } from '../common/services/GestionJournee.service';
+import { analyseMatchService } from '../common/services/AnalyseMatch.service';
+import { firestoreService } from '../common/services/Firestore.service';
+import { TrancheAnalysis } from '../common/types/football.types';
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 

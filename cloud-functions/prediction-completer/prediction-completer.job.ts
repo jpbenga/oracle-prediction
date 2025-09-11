@@ -1,9 +1,8 @@
 // backend-gcp/microservice-football/src/jobs/prediction-completer.job.ts
 
 import chalk from 'chalk';
-import { firestoreService } from '../services/Firestore.service';
-import { apiFootballService } from '../services/ApiFootball.service';
-import { runTicketGenerator } from './ticket-generator.job';
+import { firestoreService } from '../common/services/Firestore.service';
+import { apiFootballService } from '../common/services/ApiFootball.service';
 
 // Cette fonction de parsing reste la même, elle est correcte.
 function parseOdds(oddsData: any[]) {
@@ -48,7 +47,7 @@ function parseOdds(oddsData: any[]) {
     return parsed;
 }
 
-export async function runPredictionCompleter() {
+export async function runPredictionCompleter(): Promise<string[]> {
     console.log(chalk.blue.bold("--- Démarrage du Job de Complétion des Prédictions ---"));
     
     // CORRECTION : Utilisation de la méthode correcte 'findIncompletePredictions'
@@ -110,13 +109,12 @@ export async function runPredictionCompleter() {
 
     const datesToGenerate = Object.keys(updatedDates);
     if (datesToGenerate.length > 0) {
-        console.log(chalk.magenta.bold(`\n-> Des prédictions ont été complétées. Déclenchement du ticket-generator pour les dates: ${datesToGenerate.join(', ')}`));
-        for (const date of datesToGenerate) {
-            await runTicketGenerator({ date });
-        }
+        console.log(chalk.magenta.bold(`
+-> Des prédictions ont été complétées. Triggering ticket-generator for dates: ${datesToGenerate.join(', ')}`));
     } else {
         console.log(chalk.yellow("\nAucune prédiction n'a été mise à jour avec une cote. Pas de déclenchement du ticket-generator."));
     }
 
     console.log(chalk.blue.bold("--- Job de Complétion des Prédictions Terminé ---"));
+    return datesToGenerate;
 }

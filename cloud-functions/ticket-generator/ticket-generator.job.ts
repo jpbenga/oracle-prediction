@@ -1,8 +1,8 @@
 // backend-gcp/microservice-football/src/jobs/ticket-generator.job.ts
 
 import chalk from 'chalk';
-import { firestoreService } from '../services/Firestore.service';
-import { PredictionDocument } from '../types/football.types'; // Utilisation de notre type standard
+import { firestoreService } from '../common/services/Firestore.service';
+import { PredictionDocument } from '../common/types/football.types'; // Utilisation de notre type standard
 
 const MAX_MATCHES_PER_TICKET = 3;
 const MIN_TICKET_ODD = 1.8;
